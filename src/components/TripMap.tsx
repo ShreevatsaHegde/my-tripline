@@ -94,6 +94,16 @@ export default function TripMap({
       {line.length > 1 && (
         <Polyline positions={line} pathOptions={{ color: "#0f766e", weight: 3, dashArray: "6 8" }} />
       )}
+      {segmentArrows(line).map((arrow) => (
+        <Marker
+          key={`arrow-${arrow.id}`}
+          position={arrow.pos}
+          icon={arrowIcon(arrow.angle)}
+          interactive={false}
+          keyboard={false}
+        />
+      ))}
+
       {places.map((place, index) => (
         <Marker
           key={place.id}

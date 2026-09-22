@@ -40,7 +40,7 @@ function AuthenticatedLayout() {
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-card/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3">
-          <Link to="/trips" className="flex items-center gap-2 font-display text-lg font-bold">
+          <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold">
             <span className="grid size-8 place-items-center rounded-xl bg-hero-gradient text-primary-foreground">
               <MapPinned className="size-4" />
             </span>

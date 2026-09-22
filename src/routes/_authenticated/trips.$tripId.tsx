@@ -171,7 +171,32 @@ function TripDetail() {
     }
   }
 
-  const visitedCount = places.filter((p) => p.visited).length;
+  const toggleCompleted = useMutation({
+    mutationFn: async (next: boolean) => {
+      const { error } = await supabase
+        .from("trips")
+        .update({ completed: next, completed_at: next ? new Date().toISOString() : null })
+        .eq("id", tripId);
+      if (error) throw error;
+      return next;
+    },
+    onSuccess: (next) => {
+      toast.success(next ? "Trip marked as completed" : "Trip reopened");
+      queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["trips"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update"),
+  });
+
+  const visitedPlaces = places.filter((p) => p.visited);
+  const missedPlaces = places.filter((p) => !p.visited);
+  const visitedCount = visitedPlaces.length;
+  const plannedDays = trip ? tripDayCount(trip) : null;
+  const activeDays = new Set(
+    visitedPlaces
+      .filter((p) => p.visited_at)
+      .map((p) => new Date(p.visited_at!).toDateString()),
+  ).size;
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6">

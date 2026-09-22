@@ -77,7 +77,9 @@ function TripDetail() {
     queryFn: () => fetchPlaces(tripId),
   });
 
-  const activeId = hoveredId ?? selectedId;
+  // A selected place stays pinned in the panel so editing is not interrupted by hovering.
+  const activeId = selectedId ?? hoveredId;
+  const highlightId = hoveredId ?? selectedId;
   const activePlace = places.find((p) => p.id === activeId) ?? null;
 
   const addPlace = useMutation({

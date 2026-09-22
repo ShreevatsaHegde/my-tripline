@@ -184,7 +184,9 @@ function TripDetail() {
           <h1 className="mt-1 text-2xl font-bold">{trip?.title ?? "Trip"}</h1>
           <p className="text-sm text-muted-foreground">
             {visitedCount} of {places.length} places visited
+            {trip ? (tripDayCount(trip) !== null ? ` · ${tripDayCount(trip)} ${tripDayCount(trip) === 1 ? "day" : "days"}` : "") : ""}
             {trip?.start_date ? ` · from ${trip.start_date}` : ""}
+            {places.length > 1 ? ` · ${routeDistanceKm(places).toFixed(1)} km route` : ""}
           </p>
         </div>
         <button

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, Map, Repeat, Route } from "lucide-react";
+import { CheckCircle2, MapIcon, Repeat, Route } from "lucide-react";
 import {
   fetchAllPlaces,
   routeDistanceKm,
@@ -54,7 +54,7 @@ export function TripDashboard({ trips }: { trips: Trip[] }) {
 
   const stats = [
     { label: "Trips completed", value: `${tripsDone} / ${trips.length}`, icon: CheckCircle2 },
-    { label: "Places visited", value: `${visited.length}`, icon: Map },
+    { label: "Places visited", value: `${visited.length}`, icon: MapIcon },
     { label: "Kilometres travelled", value: `${totalKm.toFixed(1)} km`, icon: Route },
     { label: "Places planned", value: `${all.length}`, icon: Repeat },
   ];

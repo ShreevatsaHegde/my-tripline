@@ -1,14 +1,19 @@
-# Welcome to your Lovable project
+# Trip Weaver
+
+i want to build a website where i can track my trip plan and  have interactive UI to see the maps and route also i can check on that which are plac e3i visted and i can note the time also there
+also host this website give me its URL
 
 This project was built with [Lovable](https://lovable.dev).
 
+**Live app**: https://my-tripline.lovable.app
+
 ## Build with Lovable
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/e1b21ca1-2195-4b45-874c-c7f0f6ca9e00).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
@@ -20,10 +25,3 @@ cd <repository-name>
 npm i
 npm run dev
 ```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS

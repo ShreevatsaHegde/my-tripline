@@ -444,7 +444,7 @@ function TripDetail() {
               )}
             </ul>
             <p className="mt-4 text-[10px] text-muted-foreground">
-              Tip: leaving the visit time empty keeps a stop as planned. Now is {localNow()}.
+              Tip: leaving the visit time empty keeps a stop as planned.
             </p>
           </div>
         </aside>

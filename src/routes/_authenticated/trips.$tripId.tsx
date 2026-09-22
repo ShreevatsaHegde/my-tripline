@@ -82,6 +82,14 @@ function TripDetail() {
   const highlightId = hoveredId ?? selectedId;
   const activePlace = places.find((p) => p.id === activeId) ?? null;
 
+  // On narrow screens the panel sits under the map, so bring it into view when a pin is clicked.
+  const panelRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!selectedId) return;
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedId]);
+
   const addPlace = useMutation({
     mutationFn: async (input: {
       name: string;

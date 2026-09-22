@@ -281,7 +281,7 @@ function TripDetail() {
             <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
               <TripMap
                 places={places}
-                activeId={activeId}
+                activeId={highlightId}
                 onHover={setHoveredId}
                 onSelect={setSelectedId}
                 onMapClick={(lat, lng) => {

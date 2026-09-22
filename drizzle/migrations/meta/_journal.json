@@ -15,6 +15,13 @@
       "when": 1790089838818,
       "tag": "0001_trip_photos_storage_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790093819749,
+      "tag": "0002_add_trip_completion",
+      "breakpoints": true
     }
   ]
 }

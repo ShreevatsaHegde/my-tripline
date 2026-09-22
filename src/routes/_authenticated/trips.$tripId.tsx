@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -365,16 +366,29 @@ function TripDetail() {
                     <p className="mt-0.5 text-xs text-muted-foreground">{activePlace.address}</p>
                   )}
                 </div>
-                <button
-                  onClick={() => {
-                    if (confirm(`Remove “${activePlace.name}” from this trip?`)) {
-                      deletePlace.mutate(activePlace.id);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
-                >
-                  <Trash2 className="size-3.5" /> Remove
-                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      if (confirm(`Remove “${activePlace.name}” from this trip?`)) {
+                        deletePlace.mutate(activePlace.id);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="size-3.5" /> Remove
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedId(null);
+                      setHoveredId(null);
+                    }}
+                    aria-label="Close place details"
+                    title="Close"
+                    className="inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
               </div>
 
               {activePlace.photo_url ? (

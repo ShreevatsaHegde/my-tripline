@@ -547,6 +547,83 @@ function TripDetail() {
           </div>
         </aside>
       </div>
+
+      <section className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Trip summary</h2>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              trip?.completed
+                ? "bg-[var(--color-visited)] text-white"
+                : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            {trip?.completed ? "Completed" : "In progress"}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-2xl font-bold">{plannedDays ?? "—"}</p>
+            <p className="text-xs text-muted-foreground">
+              {plannedDays === 1 ? "day planned" : "days planned"}
+            </p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{activeDays}</p>
+            <p className="text-xs text-muted-foreground">
+              {activeDays === 1 ? "day completed" : "days completed"}
+            </p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">
+              {visitedCount} / {places.length}
+            </p>
+            <p className="text-xs text-muted-foreground">places visited</p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div>
+            <h3 className="text-sm font-semibold">Places visited</h3>
+            {visitedPlaces.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">Nothing ticked off yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {visitedPlaces.map((p) => (
+                  <li key={p.id} className="text-sm">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {p.visited_at ? new Date(p.visited_at).toLocaleString() : "no time noted"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold">Missed out places</h3>
+            {missedPlaces.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                You covered every place you planned.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {missedPlaces.map((p) => (
+                  <li key={p.id} className="text-sm">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {p.planned_at
+                        ? `planned for ${new Date(p.planned_at).toLocaleString()}`
+                        : "planned, not visited"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

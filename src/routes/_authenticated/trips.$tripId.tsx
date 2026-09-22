@@ -307,7 +307,12 @@ function TripDetail() {
           </ClientOnly>
         </div>
 
-        <aside className="flex max-h-[620px] flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-soft">
+        <aside
+          ref={panelRef}
+          className={`flex max-h-[620px] flex-col gap-4 overflow-y-auto rounded-2xl border bg-card p-4 shadow-soft ${
+            selectedId ? "border-primary/60 ring-2 ring-primary/20" : "border-border"
+          }`}
+        >
           {activePlace ? (
             <div key={activePlace.id}>
               <div className="flex items-start justify-between gap-2">

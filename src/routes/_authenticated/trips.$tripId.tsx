@@ -309,7 +309,7 @@ function TripDetail() {
 
         <aside
           ref={panelRef}
-          className={`flex max-h-[620px] flex-col gap-4 overflow-y-auto rounded-2xl border bg-card p-4 shadow-soft ${
+          className={`flex max-h-[620px] scroll-mt-20 flex-col gap-4 overflow-y-auto rounded-2xl border bg-card p-4 shadow-soft ${
             selectedId ? "border-primary/60 ring-2 ring-primary/20" : "border-border"
           }`}
         >

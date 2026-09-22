@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTrips } from "@/lib/trip-api";
 
-export const Route = createFileRoute("/_authenticated/trips")({
+export const Route = createFileRoute("/_authenticated/trips/")({
   head: () => ({
     meta: [
       { title: "My trips — Tripline" },

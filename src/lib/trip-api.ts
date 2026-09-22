@@ -7,6 +7,8 @@ export type Trip = {
   start_date: string | null;
   end_date: string | null;
   created_at: string;
+  completed: boolean;
+  completed_at: string | null;
 };
 
 export type Place = {

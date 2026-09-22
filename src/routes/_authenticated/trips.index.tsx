@@ -181,6 +181,8 @@ function TripsPage() {
         </form>
       )}
 
+      {trips && trips.length > 0 && <TripDashboard trips={trips} />}
+
       {isLoading ? (
         <p className="mt-10 text-sm text-muted-foreground">Loading your trips…</p>
       ) : trips && trips.length > 0 ? (

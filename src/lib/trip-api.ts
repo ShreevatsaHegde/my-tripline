@@ -55,6 +55,46 @@ export async function fetchPlaces(tripId: string): Promise<Place[]> {
   return data ?? [];
 }
 
+export async function fetchAllPlaces(): Promise<Place[]> {
+  const { data, error } = await supabase
+    .from("places")
+    .select(
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order",
+    )
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export function distanceKm(
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
+): number {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+export function routeDistanceKm(places: Place[]): number {
+  let total = 0;
+  for (let i = 1; i < places.length; i++) total += distanceKm(places[i - 1]!, places[i]!);
+  return total;
+}
+
+export function tripDayCount(trip: Pick<Trip, "start_date" | "end_date">): number | null {
+  if (!trip.start_date) return null;
+  const start = new Date(trip.start_date);
+  const end = trip.end_date ? new Date(trip.end_date) : start;
+  const days = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  return days > 0 ? days : 1;
+}
+
 export type GeoResult = { name: string; address: string; lat: number; lon: number };
 
 export async function searchPlaceByName(query: string): Promise<GeoResult[]> {

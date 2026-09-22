@@ -4,7 +4,8 @@ import { useState } from "react";
 import { CalendarDays, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchTrips, type Trip } from "@/lib/trip-api";
+import { fetchTrips, tripDayCount, type Trip } from "@/lib/trip-api";
+import { TripDashboard } from "@/components/TripDashboard";
 
 export const Route = createFileRoute("/_authenticated/trips/")({
   head: () => ({
@@ -181,6 +182,8 @@ function TripsPage() {
         </form>
       )}
 
+      {trips && trips.length > 0 && <TripDashboard trips={trips} />}
+
       {isLoading ? (
         <p className="mt-10 text-sm text-muted-foreground">Loading your trips…</p>
       ) : trips && trips.length > 0 ? (
@@ -263,6 +266,11 @@ function TripsPage() {
                       {trip.start_date ?? "No dates yet"}
                       {trip.end_date ? ` → ${trip.end_date}` : ""}
                     </span>
+                    {tripDayCount(trip) !== null && (
+                      <span>
+                        {tripDayCount(trip)} {tripDayCount(trip) === 1 ? "day" : "days"}
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="size-3.5" /> Open map
                     </span>

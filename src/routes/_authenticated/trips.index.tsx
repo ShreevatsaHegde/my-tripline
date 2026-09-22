@@ -266,6 +266,11 @@ function TripsPage() {
                       {trip.start_date ?? "No dates yet"}
                       {trip.end_date ? ` → ${trip.end_date}` : ""}
                     </span>
+                    {tripDayCount(trip) !== null && (
+                      <span>
+                        {tripDayCount(trip)} {tripDayCount(trip) === 1 ? "day" : "days"}
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="size-3.5" /> Open map
                     </span>

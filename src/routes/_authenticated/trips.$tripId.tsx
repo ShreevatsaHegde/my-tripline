@@ -216,12 +216,26 @@ function TripDetail() {
             {places.length > 1 ? ` · ${routeDistanceKm(places).toFixed(1)} km route` : ""}
           </p>
         </div>
-        <button
-          onClick={() => setAdding((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          <Plus className="size-4" /> Add place
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => toggleCompleted.mutate(!trip?.completed)}
+            disabled={!trip || toggleCompleted.isPending}
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
+              trip?.completed
+                ? "border-transparent bg-[var(--color-visited)] text-white"
+                : "border-border hover:bg-secondary"
+            }`}
+          >
+            <Check className="size-4" />
+            {trip?.completed ? "Trip completed" : "Mark trip as completed"}
+          </button>
+          <button
+            onClick={() => setAdding((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus className="size-4" /> Add place
+          </button>
+        </div>
       </div>
 
       {adding && (

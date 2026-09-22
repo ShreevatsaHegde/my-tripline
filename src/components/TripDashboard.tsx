@@ -31,6 +31,7 @@ export function TripDashboard({ trips }: { trips: Trip[] }) {
   }
 
   const tripsDone = trips.filter((t) => {
+    if (t.completed) return true;
     const own = all.filter((p) => p.trip_id === t.id);
     return own.length > 0 && own.every((p) => p.visited);
   }).length;

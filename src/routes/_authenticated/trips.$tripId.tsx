@@ -77,7 +77,9 @@ function TripDetail() {
     queryFn: () => fetchPlaces(tripId),
   });
 
-  const activeId = hoveredId ?? selectedId;
+  // A selected place stays pinned in the panel so editing is not interrupted by hovering.
+  const activeId = selectedId ?? hoveredId;
+  const highlightId = hoveredId ?? selectedId;
   const activePlace = places.find((p) => p.id === activeId) ?? null;
 
   const addPlace = useMutation({
@@ -279,7 +281,7 @@ function TripDetail() {
             <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
               <TripMap
                 places={places}
-                activeId={activeId}
+                activeId={highlightId}
                 onHover={setHoveredId}
                 onSelect={setSelectedId}
                 onMapClick={(lat, lng) => {
@@ -299,37 +301,139 @@ function TripDetail() {
 
         <aside className="flex max-h-[620px] flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-soft">
           {activePlace ? (
-            <div>
-              <h2 className="text-lg font-semibold">{activePlace.name}</h2>
-              {activePlace.address && (
-                <p className="mt-0.5 text-xs text-muted-foreground">{activePlace.address}</p>
-              )}
-              {activePlace.photo_url && (
+            <div key={activePlace.id}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-semibold">{activePlace.name}</h2>
+                  {activePlace.address && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{activePlace.address}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm(`Remove “${activePlace.name}” from this trip?`)) {
+                      deletePlace.mutate(activePlace.id);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
+                >
+                  <Trash2 className="size-3.5" /> Remove
+                </button>
+              </div>
+
+              {activePlace.photo_url ? (
                 <PhotoImage
                   path={activePlace.photo_url}
                   alt={activePlace.name}
                   className="mt-3 h-44 w-full rounded-xl object-cover"
                 />
+              ) : (
+                <div className="mt-3 flex h-24 w-full items-center justify-center rounded-xl border border-dashed border-border text-xs text-muted-foreground">
+                  No photo yet
+                </div>
               )}
-              <div className="mt-3 space-y-1 text-sm">
-                {activePlace.planned_at && (
-                  <p className="flex items-center gap-1.5 text-muted-foreground">
-                    <Clock className="size-3.5" /> Planned:{" "}
-                    {new Date(activePlace.planned_at).toLocaleString()}
-                  </p>
-                )}
-                {activePlace.visited_at && (
-                  <p className="flex items-center gap-1.5 text-visited">
-                    <Check className="size-3.5" /> Visited:{" "}
-                    {new Date(activePlace.visited_at).toLocaleString()}
-                  </p>
-                )}
-                {activePlace.notes && <p className="pt-1 text-sm">{activePlace.notes}</p>}
+
+              <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-primary">
+                <Camera className="size-3.5" />
+                {activePlace.photo_url ? "Replace photo" : "Attach photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handlePhoto(activePlace, file);
+                  }}
+                />
+              </label>
+
+              <label className="mt-3 flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={activePlace.visited}
+                  onChange={(e) =>
+                    updatePlace.mutate({
+                      id: activePlace.id,
+                      patch: {
+                        visited: e.target.checked,
+                        visited_at: e.target.checked
+                          ? (activePlace.visited_at ?? new Date().toISOString())
+                          : null,
+                      },
+                    })
+                  }
+                  className="size-4 accent-[var(--color-visited)]"
+                />
+                Mark as visited
+              </label>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-muted-foreground">
+                  Planned time
+                  <input
+                    type="datetime-local"
+                    value={toLocalInput(activePlace.planned_at)}
+                    onChange={(e) =>
+                      updatePlace.mutate({
+                        id: activePlace.id,
+                        patch: {
+                          planned_at: e.target.value
+                            ? new Date(e.target.value).toISOString()
+                            : null,
+                        },
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  Visit time
+                  <input
+                    type="datetime-local"
+                    value={toLocalInput(activePlace.visited_at)}
+                    onChange={(e) =>
+                      updatePlace.mutate({
+                        id: activePlace.id,
+                        patch: {
+                          visited_at: e.target.value
+                            ? new Date(e.target.value).toISOString()
+                            : null,
+                          visited: e.target.value ? true : activePlace.visited,
+                        },
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
               </div>
+
+              <label className="mt-3 block text-xs text-muted-foreground">
+                Notes
+                <textarea
+                  defaultValue={activePlace.notes ?? ""}
+                  onBlur={(e) =>
+                    e.target.value !== (activePlace.notes ?? "") &&
+                    updatePlace.mutate({ id: activePlace.id, patch: { notes: e.target.value } })
+                  }
+                  placeholder="What you did here, tickets, food, anything…"
+                  rows={3}
+                  className="mt-1 w-full resize-none rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                />
+              </label>
+
+              {selectedId && (
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className="mt-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Close details
+                </button>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Hover or tap a pin on the map to see that stop's details, time and photo here.
+              Click a pin on the map (or a stop below) to add its details, time, notes and photo
+              here.
             </p>
           )}
 
@@ -337,100 +441,42 @@ function TripDetail() {
             <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               Itinerary
             </h3>
-            <ul className="mt-3 space-y-3">
+            <ul className="mt-3 space-y-2">
               {places.map((place, index) => (
-                <li
-                  key={place.id}
-                  onMouseEnter={() => setHoveredId(place.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => setSelectedId(place.id)}
-                  className={`rounded-xl border p-3 transition-colors ${
-                    activeId === place.id ? "border-primary bg-secondary/50" : "border-border"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold">
-                        {index + 1}. {place.name}
-                      </p>
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="size-3" />
-                        {place.visited ? "Visited" : "Planned"}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => deletePlace.mutate(place.id)}
-                      aria-label="Remove place"
-                      className="text-muted-foreground transition-colors hover:text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-
-                  <label className="mt-2 flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={place.visited}
-                      onChange={(e) =>
-                        updatePlace.mutate({
-                          id: place.id,
-                          patch: {
-                            visited: e.target.checked,
-                            visited_at: e.target.checked
-                              ? (place.visited_at ?? new Date().toISOString())
-                              : null,
-                          },
-                        })
-                      }
-                      className="size-4 accent-[var(--color-visited)]"
-                    />
-                    Mark as visited
-                  </label>
-
-                  <label className="mt-2 block text-xs text-muted-foreground">
-                    Visit time
-                    <input
-                      type="datetime-local"
-                      value={toLocalInput(place.visited_at)}
-                      onChange={(e) =>
-                        updatePlace.mutate({
-                          id: place.id,
-                          patch: {
-                            visited_at: e.target.value
-                              ? new Date(e.target.value).toISOString()
-                              : null,
-                            visited: e.target.value ? true : place.visited,
-                          },
-                        })
-                      }
-                      className="mt-1 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </label>
-
-                  <textarea
-                    defaultValue={place.notes ?? ""}
-                    onBlur={(e) =>
-                      e.target.value !== (place.notes ?? "") &&
-                      updatePlace.mutate({ id: place.id, patch: { notes: e.target.value } })
-                    }
-                    placeholder="Notes about this stop…"
-                    rows={2}
-                    className="mt-2 w-full resize-none rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-ring"
-                  />
-
-                  <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-primary">
-                    <Camera className="size-3.5" />
-                    {place.photo_url ? "Replace photo" : "Add photo"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void handlePhoto(place, file);
+                <li key={place.id}>
+                  <button
+                    onMouseEnter={() => setHoveredId(place.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    onClick={() => setSelectedId(place.id)}
+                    className={`flex w-full items-center gap-2 rounded-xl border p-2.5 text-left transition-colors ${
+                      highlightId === place.id
+                        ? "border-primary bg-secondary/50"
+                        : "border-border hover:bg-secondary/40"
+                    }`}
+                  >
+                    <span
+                      className="grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white"
+                      style={{
+                        background: place.visited
+                          ? "var(--color-visited)"
+                          : "var(--color-planned)",
                       }}
-                    />
-                  </label>
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{place.name}</span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="size-3" />
+                        {place.visited
+                          ? place.visited_at
+                            ? new Date(place.visited_at).toLocaleString()
+                            : "Visited"
+                          : "Planned"}
+                      </span>
+                    </span>
+                    {place.photo_url && <Camera className="size-3.5 text-muted-foreground" />}
+                  </button>
                 </li>
               ))}
               {places.length === 0 && (
@@ -440,7 +486,7 @@ function TripDetail() {
               )}
             </ul>
             <p className="mt-4 text-[10px] text-muted-foreground">
-              Tip: leaving the visit time empty keeps a stop as planned.
+              Tip: arrows on the map show the order you travel from stop 1 onwards.
             </p>
           </div>
         </aside>

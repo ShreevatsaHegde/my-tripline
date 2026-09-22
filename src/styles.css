@@ -181,3 +181,17 @@
   font-family: var(--font-sans);
   background: var(--color-surface);
 }
+
+.route-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--color-primary);
+  text-shadow:
+    0 0 2px var(--color-card),
+    0 0 4px var(--color-card);
+}

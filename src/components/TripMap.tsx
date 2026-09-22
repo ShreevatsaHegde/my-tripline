@@ -18,8 +18,8 @@ function pinIcon(index: number, visited: boolean, active: boolean) {
 function arrowIcon(angleDeg: number) {
   return L.divIcon({
     className: "",
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
     html: `<div class="route-arrow" style="transform:rotate(${angleDeg}deg)">➤</div>`,
   });
 }

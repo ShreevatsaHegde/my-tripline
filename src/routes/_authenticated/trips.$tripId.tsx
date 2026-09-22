@@ -391,11 +391,7 @@ function TripDetail() {
                     Visit time
                     <input
                       type="datetime-local"
-                      value={
-                        place.visited_at
-                          ? new Date(place.visited_at).toISOString().slice(0, 16)
-                          : ""
-                      }
+                      value={toLocalInput(place.visited_at)}
                       onChange={(e) =>
                         updatePlace.mutate({
                           id: place.id,

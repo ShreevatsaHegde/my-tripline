@@ -23,6 +23,8 @@ import {
   uploadPhoto,
   type GeoResult,
   type Place,
+  tripDayCount,
+  routeDistanceKm,
 } from "@/lib/trip-api";
 
 const TripMap = lazy(() => import("@/components/TripMap"));

@@ -15,6 +15,30 @@ function pinIcon(index: number, visited: boolean, active: boolean) {
   });
 }
 
+function arrowIcon(angleDeg: number) {
+  return L.divIcon({
+    className: "",
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    html: `<div class="route-arrow" style="transform:rotate(${angleDeg}deg)">➤</div>`,
+  });
+}
+
+function segmentArrows(points: [number, number][]) {
+  const arrows: { id: string; pos: [number, number]; angle: number }[] = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const [lat1, lng1] = points[i]!;
+    const [lat2, lng2] = points[i + 1]!;
+    const mid: [number, number] = [(lat1 + lat2) / 2, (lng1 + lng2) / 2];
+    const dx = (lng2 - lng1) * Math.cos(((lat1 + lat2) / 2) * (Math.PI / 180));
+    const dy = lat2 - lat1;
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    arrows.push({ id: `${i}`, pos: mid, angle: -angle });
+  }
+  return arrows;
+}
+
+
 function FitBounds({ places }: { places: Place[] }) {
   const map = useMap();
   useEffect(() => {

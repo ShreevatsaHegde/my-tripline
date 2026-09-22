@@ -171,7 +171,32 @@ function TripDetail() {
     }
   }
 
-  const visitedCount = places.filter((p) => p.visited).length;
+  const toggleCompleted = useMutation({
+    mutationFn: async (next: boolean) => {
+      const { error } = await supabase
+        .from("trips")
+        .update({ completed: next, completed_at: next ? new Date().toISOString() : null })
+        .eq("id", tripId);
+      if (error) throw error;
+      return next;
+    },
+    onSuccess: (next) => {
+      toast.success(next ? "Trip marked as completed" : "Trip reopened");
+      queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["trips"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update"),
+  });
+
+  const visitedPlaces = places.filter((p) => p.visited);
+  const missedPlaces = places.filter((p) => !p.visited);
+  const visitedCount = visitedPlaces.length;
+  const plannedDays = trip ? tripDayCount(trip) : null;
+  const activeDays = new Set(
+    visitedPlaces
+      .filter((p) => p.visited_at)
+      .map((p) => new Date(p.visited_at!).toDateString()),
+  ).size;
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6">
@@ -191,12 +216,26 @@ function TripDetail() {
             {places.length > 1 ? ` · ${routeDistanceKm(places).toFixed(1)} km route` : ""}
           </p>
         </div>
-        <button
-          onClick={() => setAdding((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          <Plus className="size-4" /> Add place
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => toggleCompleted.mutate(!trip?.completed)}
+            disabled={!trip || toggleCompleted.isPending}
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
+              trip?.completed
+                ? "border-transparent bg-[var(--color-visited)] text-white"
+                : "border-border hover:bg-secondary"
+            }`}
+          >
+            <Check className="size-4" />
+            {trip?.completed ? "Trip completed" : "Mark trip as completed"}
+          </button>
+          <button
+            onClick={() => setAdding((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus className="size-4" /> Add place
+          </button>
+        </div>
       </div>
 
       {adding && (
@@ -508,6 +547,83 @@ function TripDetail() {
           </div>
         </aside>
       </div>
+
+      <section className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Trip summary</h2>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              trip?.completed
+                ? "bg-[var(--color-visited)] text-white"
+                : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            {trip?.completed ? "Completed" : "In progress"}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-2xl font-bold">{plannedDays ?? "—"}</p>
+            <p className="text-xs text-muted-foreground">
+              {plannedDays === 1 ? "day planned" : "days planned"}
+            </p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{activeDays}</p>
+            <p className="text-xs text-muted-foreground">
+              {activeDays === 1 ? "day completed" : "days completed"}
+            </p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">
+              {visitedCount} / {places.length}
+            </p>
+            <p className="text-xs text-muted-foreground">places visited</p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div>
+            <h3 className="text-sm font-semibold">Places visited</h3>
+            {visitedPlaces.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">Nothing ticked off yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {visitedPlaces.map((p) => (
+                  <li key={p.id} className="text-sm">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {p.visited_at ? new Date(p.visited_at).toLocaleString() : "no time noted"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold">Missed out places</h3>
+            {missedPlaces.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                You covered every place you planned.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {missedPlaces.map((p) => (
+                  <li key={p.id} className="text-sm">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {p.planned_at
+                        ? `planned for ${new Date(p.planned_at).toLocaleString()}`
+                        : "planned, not visited"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

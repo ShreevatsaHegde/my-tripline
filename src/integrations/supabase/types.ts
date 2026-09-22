@@ -93,6 +93,8 @@ export type Database = {
       }
       trips: {
         Row: {
+          completed: boolean
+          completed_at: string | null
           created_at: string
           description: string | null
           end_date: string | null
@@ -102,6 +104,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          completed?: boolean
+          completed_at?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null
@@ -111,6 +115,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          completed?: boolean
+          completed_at?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null

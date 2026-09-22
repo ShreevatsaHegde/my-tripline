@@ -7,6 +7,8 @@ export type Trip = {
   start_date: string | null;
   end_date: string | null;
   created_at: string;
+  completed: boolean;
+  completed_at: string | null;
 };
 
 export type Place = {
@@ -27,7 +29,7 @@ export type Place = {
 export async function fetchTrips(): Promise<Trip[]> {
   const { data, error } = await supabase
     .from("trips")
-    .select("id, title, description, start_date, end_date, created_at")
+    .select("id, title, description, start_date, end_date, created_at, completed, completed_at")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
@@ -36,7 +38,7 @@ export async function fetchTrips(): Promise<Trip[]> {
 export async function fetchTrip(id: string): Promise<Trip> {
   const { data, error } = await supabase
     .from("trips")
-    .select("id, title, description, start_date, end_date, created_at")
+    .select("id, title, description, start_date, end_date, created_at, completed, completed_at")
     .eq("id", id)
     .single();
   if (error) throw error;

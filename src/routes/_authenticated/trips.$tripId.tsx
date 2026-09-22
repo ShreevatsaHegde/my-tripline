@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ClientOnly } from "@tanstack/react-router";
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -81,6 +81,14 @@ function TripDetail() {
   const activeId = selectedId ?? hoveredId;
   const highlightId = hoveredId ?? selectedId;
   const activePlace = places.find((p) => p.id === activeId) ?? null;
+
+  // On narrow screens the panel sits under the map, so bring it into view when a pin is clicked.
+  const panelRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!selectedId) return;
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedId]);
 
   const addPlace = useMutation({
     mutationFn: async (input: {
@@ -299,7 +307,12 @@ function TripDetail() {
           </ClientOnly>
         </div>
 
-        <aside className="flex max-h-[620px] flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-soft">
+        <aside
+          ref={panelRef}
+          className={`flex max-h-[620px] scroll-mt-20 flex-col gap-4 overflow-y-auto rounded-2xl border bg-card p-4 shadow-soft ${
+            selectedId ? "border-primary/60 ring-2 ring-primary/20" : "border-border"
+          }`}
+        >
           {activePlace ? (
             <div key={activePlace.id}>
               <div className="flex items-start justify-between gap-2">

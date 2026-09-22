@@ -4,7 +4,8 @@ import { useState } from "react";
 import { CalendarDays, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchTrips, type Trip } from "@/lib/trip-api";
+import { fetchTrips, tripDayCount, type Trip } from "@/lib/trip-api";
+import { TripDashboard } from "@/components/TripDashboard";
 
 export const Route = createFileRoute("/_authenticated/trips/")({
   head: () => ({

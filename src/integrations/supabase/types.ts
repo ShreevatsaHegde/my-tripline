@@ -14,7 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      places: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          name: string
+          notes: string | null
+          photo_url: string | null
+          planned_at: string | null
+          sort_order: number
+          trip_id: string
+          user_id: string
+          visited: boolean
+          visited_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          name: string
+          notes?: string | null
+          photo_url?: string | null
+          planned_at?: string | null
+          sort_order?: number
+          trip_id: string
+          user_id: string
+          visited?: boolean
+          visited_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          name?: string
+          notes?: string | null
+          photo_url?: string | null
+          planned_at?: string | null
+          sort_order?: number
+          trip_id?: string
+          user_id?: string
+          visited?: boolean
+          visited_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "places_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      trips: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          start_date: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

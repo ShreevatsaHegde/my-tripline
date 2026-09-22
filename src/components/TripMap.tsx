@@ -68,7 +68,7 @@ export default function TripMap({
       <FitBounds places={places} />
       <ClickCapture onMapClick={onMapClick} />
       {line.length > 1 && (
-        <Polyline positions={line} pathOptions={{ color: "var(--color-primary)", weight: 3, dashArray: "6 8" }} />
+        <Polyline positions={line} pathOptions={{ color: "#0f766e", weight: 3, dashArray: "6 8" }} />
       )}
       {places.map((place, index) => (
         <Marker

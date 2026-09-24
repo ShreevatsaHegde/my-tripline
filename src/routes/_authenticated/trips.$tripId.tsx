@@ -3,7 +3,9 @@ import { ClientOnly } from "@tanstack/react-router";
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   Camera,
   Check,
   Clock,
@@ -148,6 +150,29 @@ function TripDetail() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["places", tripId] }),
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not save"),
+  });
+
+  const movePlace = useMutation({
+    mutationFn: async ({ id, dir }: { id: string; dir: -1 | 1 }) => {
+      const index = places.findIndex((p) => p.id === id);
+      const other = index + dir;
+      if (index < 0 || other < 0 || other >= places.length) return;
+      const a = places[index]!;
+      const b = places[other]!;
+      const { error: e1 } = await supabase
+        .from("places")
+        .update({ sort_order: b.sort_order })
+        .eq("id", a.id);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase
+        .from("places")
+        .update({ sort_order: a.sort_order })
+        .eq("id", b.id);
+      if (e2) throw e2;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["places", tripId] }),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not reorder stops"),
   });
 
   const deletePlace = useMutation({

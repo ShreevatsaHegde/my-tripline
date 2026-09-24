@@ -26,6 +26,7 @@ export type Database = {
           photo_url: string | null
           planned_at: string | null
           sort_order: number
+          travel_mode: string
           trip_id: string
           user_id: string
           visited: boolean
@@ -42,6 +43,7 @@ export type Database = {
           photo_url?: string | null
           planned_at?: string | null
           sort_order?: number
+          travel_mode?: string
           trip_id: string
           user_id: string
           visited?: boolean
@@ -58,6 +60,7 @@ export type Database = {
           photo_url?: string | null
           planned_at?: string | null
           sort_order?: number
+          travel_mode?: string
           trip_id?: string
           user_id?: string
           visited?: boolean

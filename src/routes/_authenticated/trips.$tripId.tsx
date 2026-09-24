@@ -3,7 +3,9 @@ import { ClientOnly } from "@tanstack/react-router";
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   Camera,
   Check,
   Clock,
@@ -148,6 +150,29 @@ function TripDetail() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["places", tripId] }),
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not save"),
+  });
+
+  const movePlace = useMutation({
+    mutationFn: async ({ id, dir }: { id: string; dir: -1 | 1 }) => {
+      const index = places.findIndex((p) => p.id === id);
+      const other = index + dir;
+      if (index < 0 || other < 0 || other >= places.length) return;
+      const a = places[index]!;
+      const b = places[other]!;
+      const { error: e1 } = await supabase
+        .from("places")
+        .update({ sort_order: b.sort_order })
+        .eq("id", a.id);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase
+        .from("places")
+        .update({ sort_order: a.sort_order })
+        .eq("id", b.id);
+      if (e2) throw e2;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["places", tripId] }),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not reorder stops"),
   });
 
   const deletePlace = useMutation({
@@ -647,12 +672,12 @@ function TripDetail() {
             </h3>
             <ul className="mt-3 space-y-2">
               {places.map((place, index) => (
-                <li key={place.id}>
+                <li key={place.id} className="flex items-center gap-1.5">
                   <button
                     onMouseEnter={() => setHoveredId(place.id)}
                     onMouseLeave={() => setHoveredId(null)}
                     onClick={() => setSelectedId(place.id)}
-                    className={`flex w-full items-center gap-2 rounded-xl border p-2.5 text-left transition-colors ${
+                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border p-2.5 text-left transition-colors ${
                       highlightId === place.id
                         ? "border-primary bg-secondary/50"
                         : "border-border hover:bg-secondary/40"
@@ -681,6 +706,26 @@ function TripDetail() {
                     </span>
                     {place.photo_url && <Camera className="size-3.5 text-muted-foreground" />}
                   </button>
+                  <span className="flex shrink-0 flex-col gap-0.5">
+                    <button
+                      onClick={() => movePlace.mutate({ id: place.id, dir: -1 })}
+                      disabled={index === 0 || movePlace.isPending}
+                      aria-label={`Move ${place.name} earlier`}
+                      title="Move earlier in the route"
+                      className="grid size-6 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                    >
+                      <ArrowUp className="size-3.5" />
+                    </button>
+                    <button
+                      onClick={() => movePlace.mutate({ id: place.id, dir: 1 })}
+                      disabled={index === places.length - 1 || movePlace.isPending}
+                      aria-label={`Move ${place.name} later`}
+                      title="Move later in the route"
+                      className="grid size-6 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                    >
+                      <ArrowDown className="size-3.5" />
+                    </button>
+                  </span>
                 </li>
               ))}
               {places.length === 0 && (

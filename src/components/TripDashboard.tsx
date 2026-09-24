@@ -1,12 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, MapIcon, Repeat, Route } from "lucide-react";
-import {
-  fetchAllPlaces,
-  routeDistanceKm,
-  type Place,
-  type Trip,
-} from "@/lib/trip-api";
+import { fetchAllPlaces, fetchLeg, type Place, type Trip } from "@/lib/trip-api";
 
 function formatWhen(value: string | null) {
   if (!value) return "no time noted";
@@ -25,10 +20,22 @@ export function TripDashboard({ trips }: { trips: Trip[] }) {
   const visited = all.filter((p) => p.visited);
   const tripTitle = new Map(trips.map((t) => [t.id, t.title]));
 
-  let totalKm = 0;
-  for (const trip of trips) {
-    totalKm += routeDistanceKm(all.filter((p) => p.trip_id === trip.id));
-  }
+  // Total distance honours each leg's road/flight choice (road = real road distance).
+  const legsKey = all.map((p) => `${p.id}:${p.latitude},${p.longitude}:${p.travel_mode}`).join("|");
+  const { data: totalKm = 0 } = useQuery({
+    queryKey: ["dashboard-legs", legsKey],
+    queryFn: async () => {
+      let sum = 0;
+      for (const trip of trips) {
+        const own = all.filter((p) => p.trip_id === trip.id);
+        const legs = await Promise.all(own.slice(1).map((p, i) => fetchLeg(own[i]!, p)));
+        sum += legs.reduce((s, l) => s + l.km, 0);
+      }
+      return sum;
+    },
+    staleTime: 60 * 60 * 1000,
+    enabled: all.length > 1,
+  });
 
   const tripsDone = trips.filter((t) => {
     if (t.completed) return true;

@@ -24,7 +24,10 @@ export type Place = {
   notes: string | null;
   photo_url: string | null;
   sort_order: number;
+  travel_mode: TravelMode;
 };
+
+export type TravelMode = "road" | "flight";
 
 export async function fetchTrips(): Promise<Trip[]> {
   const { data, error } = await supabase
@@ -49,23 +52,23 @@ export async function fetchPlaces(tripId: string): Promise<Place[]> {
   const { data, error } = await supabase
     .from("places")
     .select(
-      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order",
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode",
     )
     .eq("trip_id", tripId)
     .order("sort_order", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as Place[];
 }
 
 export async function fetchAllPlaces(): Promise<Place[]> {
   const { data, error } = await supabase
     .from("places")
     .select(
-      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order",
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode",
     )
     .order("sort_order", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as Place[];
 }
 
 export function distanceKm(
@@ -145,4 +148,47 @@ export async function signedPhotoUrl(path: string): Promise<string | null> {
     .createSignedUrl(path, 60 * 60);
   if (error) return null;
   return data.signedUrl;
+}
+
+export type Leg = {
+  fromId: string;
+  toId: string;
+  mode: TravelMode;
+  km: number;
+  coords: [number, number][];
+  road: boolean; // true when a real road path was found
+};
+
+/** Road route between two points via the free OSRM service; falls back to a straight line. */
+export async function fetchLeg(a: Place, b: Place): Promise<Leg> {
+  const straight: Leg = {
+    fromId: a.id,
+    toId: b.id,
+    mode: b.travel_mode,
+    km: distanceKm(a, b),
+    coords: [
+      [a.latitude, a.longitude],
+      [b.latitude, b.longitude],
+    ],
+    road: false,
+  };
+  if (b.travel_mode === "flight") return straight;
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${a.longitude},${a.latitude};${b.longitude},${b.latitude}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) return straight;
+    const json = (await res.json()) as {
+      routes?: { distance: number; geometry: { coordinates: [number, number][] } }[];
+    };
+    const r = json.routes?.[0];
+    if (!r) return straight;
+    return {
+      ...straight,
+      km: r.distance / 1000,
+      coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
+      road: true,
+    };
+  } catch {
+    return straight;
+  }
 }

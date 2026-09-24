@@ -1,0 +1,1 @@
+ALTER TABLE public.places ADD COLUMN travel_mode text NOT NULL DEFAULT 'road' CHECK (travel_mode IN ('road','flight'));

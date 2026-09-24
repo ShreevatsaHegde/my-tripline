@@ -22,6 +22,13 @@
       "when": 1790093819749,
       "tag": "0002_add_trip_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790230225730,
+      "tag": "0003_add_place_travel_mode",
+      "breakpoints": true
     }
   ]
 }

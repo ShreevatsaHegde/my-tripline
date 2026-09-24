@@ -1,7 +1,7 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import L from "leaflet";
 import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import type { Place } from "@/lib/trip-api";
+import type { Leg, Place } from "@/lib/trip-api";
 
 function pinIcon(index: number, visited: boolean, active: boolean) {
   const color = visited ? "var(--color-visited)" : "var(--color-planned)";
@@ -58,22 +58,19 @@ function ClickCapture({ onMapClick }: { onMapClick: (lat: number, lng: number) =
 
 export default function TripMap({
   places,
+  legs,
   activeId,
   onHover,
   onSelect,
   onMapClick,
 }: {
   places: Place[];
+  legs: Leg[];
   activeId: string | null;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
   onMapClick: (lat: number, lng: number) => void;
 }) {
-  const line = useMemo(
-    () => places.map((p) => [p.latitude, p.longitude] as [number, number]),
-    [places],
-  );
-
   const center: [number, number] = places[0]
     ? [places[0].latitude, places[0].longitude]
     : [20.5937, 78.9629];
@@ -91,18 +88,32 @@ export default function TripMap({
       />
       <FitBounds places={places} />
       <ClickCapture onMapClick={onMapClick} />
-      {line.length > 1 && (
-        <Polyline positions={line} pathOptions={{ color: "#0f766e", weight: 3, dashArray: "6 8" }} />
-      )}
-      {segmentArrows(line).map((arrow) => (
-        <Marker
-          key={`arrow-${arrow.id}`}
-          position={arrow.pos}
-          icon={arrowIcon(arrow.angle)}
-          interactive={false}
-          keyboard={false}
+      {legs.map((leg) => (
+        <Polyline
+          key={`leg-${leg.fromId}-${leg.toId}`}
+          positions={leg.coords}
+          pathOptions={
+            leg.mode === "flight"
+              ? { color: "#b45309", weight: 3, dashArray: "2 10", lineCap: "round" }
+              : { color: "#0f766e", weight: 4, opacity: 0.85 }
+          }
         />
       ))}
+      {legs.map((leg) => {
+        const pts = leg.coords;
+        const i = Math.max(0, Math.floor((pts.length - 1) / 2));
+        const seg = segmentArrows([pts[i]!, pts[Math.min(i + 1, pts.length - 1)]!])[0];
+        if (!seg) return null;
+        return (
+          <Marker
+            key={`arrow-${leg.fromId}-${leg.toId}`}
+            position={seg.pos}
+            icon={arrowIcon(seg.angle)}
+            interactive={false}
+            keyboard={false}
+          />
+        );
+      })}
 
       {places.map((place, index) => (
         <Marker

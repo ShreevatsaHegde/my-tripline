@@ -7,7 +7,9 @@ import {
   Camera,
   Check,
   Clock,
+  Car,
   Loader2,
+  Plane,
   MapPin,
   Plus,
   Search,
@@ -25,7 +27,8 @@ import {
   type GeoResult,
   type Place,
   tripDayCount,
-  routeDistanceKm,
+  fetchLeg,
+  type TravelMode,
 } from "@/lib/trip-api";
 
 const TripMap = lazy(() => import("@/components/TripMap"));
@@ -79,6 +82,17 @@ function TripDetail() {
     queryKey: ["places", tripId],
     queryFn: () => fetchPlaces(tripId),
   });
+
+  const legKey = places.map((p) => `${p.id}:${p.latitude},${p.longitude}:${p.travel_mode}`).join("|");
+  const { data: legs = [] } = useQuery({
+    queryKey: ["legs", legKey],
+    queryFn: () => Promise.all(places.slice(1).map((p, i) => fetchLeg(places[i]!, p))),
+    staleTime: 60 * 60 * 1000,
+    enabled: places.length > 1,
+  });
+  const totalKm = legs.reduce((sum, l) => sum + l.km, 0);
+  const setMode = (id: string, mode: TravelMode) =>
+    updatePlace.mutate({ id, patch: { travel_mode: mode } });
 
   // A selected place stays pinned in the panel so editing is not interrupted by hovering.
   const activeId = selectedId ?? hoveredId;
@@ -214,7 +228,7 @@ function TripDetail() {
             {visitedCount} of {places.length} places visited
             {trip ? (tripDayCount(trip) !== null ? ` · ${tripDayCount(trip)} ${tripDayCount(trip) === 1 ? "day" : "days"}` : "") : ""}
             {trip?.start_date ? ` · from ${trip.start_date}` : ""}
-            {places.length > 1 ? ` · ${routeDistanceKm(places).toFixed(1)} km route` : ""}
+            {legs.length > 0 ? ` · ${totalKm.toFixed(1)} km route` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -238,6 +252,115 @@ function TripDetail() {
           </button>
         </div>
       </div>
+
+      <section className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-soft">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Trip summary</h2>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              trip?.completed
+                ? "bg-[var(--color-visited)] text-white"
+                : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            {trip?.completed ? "Completed" : "In progress"}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-2xl font-bold">{plannedDays ?? "—"}</p>
+            <p className="text-xs text-muted-foreground">
+              {plannedDays === 1 ? "day planned" : "days planned"}
+            </p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{activeDays}</p>
+            <p className="text-xs text-muted-foreground">
+              {activeDays === 1 ? "day completed" : "days completed"}
+            </p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">
+              {visitedCount} / {places.length}
+            </p>
+            <p className="text-xs text-muted-foreground">places visited</p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div>
+            <h3 className="text-sm font-semibold">Places visited</h3>
+            {visitedPlaces.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">Nothing ticked off yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {visitedPlaces.map((p) => (
+                  <li key={p.id} className="text-sm">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {p.visited_at ? new Date(p.visited_at).toLocaleString() : "no time noted"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold">Missed out places</h3>
+            {missedPlaces.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                You covered every place you planned.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {missedPlaces.map((p) => (
+                  <li key={p.id} className="text-sm">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {p.planned_at
+                        ? `planned for ${new Date(p.planned_at).toLocaleString()}`
+                        : "planned, not visited"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {legs.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold">Route legs · {totalKm.toFixed(1)} km</h3>
+            <ul className="mt-3 space-y-2">
+              {legs.map((leg, i) => {
+                const to = places[i + 1]!;
+                return (
+                  <li
+                    key={`${leg.fromId}-${leg.toId}`}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-2.5 text-sm"
+                  >
+                    <span className="min-w-0">
+                      <span className="font-medium">
+                        {i + 1} → {i + 2}: {places[i]!.name} → {to.name}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {leg.km.toFixed(1)} km{" "}
+                        {leg.mode === "flight"
+                          ? "direct flight distance"
+                          : leg.road
+                            ? "by road"
+                            : "straight line (no road found)"}
+                      </span>
+                    </span>
+                    <ModeToggle value={to.travel_mode} onChange={(m) => setMode(to.id, m)} />
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </section>
 
       {adding && (
         <div className="mt-5 rounded-2xl border border-border bg-card p-5 shadow-soft">
@@ -333,6 +456,7 @@ function TripDetail() {
             <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
               <TripMap
                 places={places}
+                legs={legs}
                 activeId={highlightId}
                 onHover={setHoveredId}
                 onSelect={setSelectedId}
@@ -416,6 +540,16 @@ function TripDetail() {
                   }}
                 />
               </label>
+
+              {places.findIndex((p) => p.id === activePlace.id) > 0 && (
+                <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  Travel here from previous stop by
+                  <ModeToggle
+                    value={activePlace.travel_mode}
+                    onChange={(m) => setMode(activePlace.id, m)}
+                  />
+                </div>
+              )}
 
               <label className="mt-3 flex items-center gap-2 text-sm font-medium">
                 <input
@@ -562,82 +696,29 @@ function TripDetail() {
         </aside>
       </div>
 
-      <section className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Trip summary</h2>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              trip?.completed
-                ? "bg-[var(--color-visited)] text-white"
-                : "bg-secondary text-muted-foreground"
-            }`}
-          >
-            {trip?.completed ? "Completed" : "In progress"}
-          </span>
-        </div>
+    </div>
+  );
+}
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <div>
-            <p className="text-2xl font-bold">{plannedDays ?? "—"}</p>
-            <p className="text-xs text-muted-foreground">
-              {plannedDays === 1 ? "day planned" : "days planned"}
-            </p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{activeDays}</p>
-            <p className="text-xs text-muted-foreground">
-              {activeDays === 1 ? "day completed" : "days completed"}
-            </p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold">
-              {visitedCount} / {places.length}
-            </p>
-            <p className="text-xs text-muted-foreground">places visited</p>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <div>
-            <h3 className="text-sm font-semibold">Places visited</h3>
-            {visitedPlaces.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">Nothing ticked off yet.</p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {visitedPlaces.map((p) => (
-                  <li key={p.id} className="text-sm">
-                    <span className="font-medium">{p.name}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {p.visited_at ? new Date(p.visited_at).toLocaleString() : "no time noted"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold">Missed out places</h3>
-            {missedPlaces.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">
-                You covered every place you planned.
-              </p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {missedPlaces.map((p) => (
-                  <li key={p.id} className="text-sm">
-                    <span className="font-medium">{p.name}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {p.planned_at
-                        ? `planned for ${new Date(p.planned_at).toLocaleString()}`
-                        : "planned, not visited"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </section>
+function ModeToggle({ value, onChange }: { value: TravelMode; onChange: (m: TravelMode) => void }) {
+  const opts: { m: TravelMode; label: string; Icon: typeof Car }[] = [
+    { m: "road", label: "Road", Icon: Car },
+    { m: "flight", label: "Flight", Icon: Plane },
+  ];
+  return (
+    <div className="inline-flex overflow-hidden rounded-lg border border-border">
+      {opts.map(({ m, label, Icon }) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => value !== m && onChange(m)}
+          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium ${
+            value === m ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
+          }`}
+        >
+          <Icon className="size-3.5" /> {label}
+        </button>
+      ))}
     </div>
   );
 }

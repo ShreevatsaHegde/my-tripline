@@ -1,3 +1,4 @@
+import { googlePlaceSearch } from "@/lib/places.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Trip = {
@@ -141,6 +142,12 @@ async function searchNominatim(query: string): Promise<GeoResult[]> {
 
 /** Combines a typo-tolerant search (Photon) with Nominatim so more places are found. */
 export async function searchPlaceByName(query: string): Promise<GeoResult[]> {
+  try {
+    const google = await googlePlaceSearch({ data: { query } });
+    if (google.length > 0) return google;
+  } catch (e) {
+    console.warn("Google search unavailable, using open map search", e);
+  }
   const [a, b] = await Promise.allSettled([searchPhoton(query), searchNominatim(query)]);
   const all = [
     ...(a.status === "fulfilled" ? a.value : []),

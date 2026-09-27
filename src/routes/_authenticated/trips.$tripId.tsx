@@ -666,7 +666,6 @@ function TripDetail() {
                   {(
                     [
                       ["stay_name", "Hotel / stay name", "e.g. Hotel Sunrise"],
-                      ["stay_address", "Stay address", "Address or area"],
                     ] as const
                   ).map(([field, label, ph]) => (
                     <label key={field} className="text-xs text-muted-foreground">
@@ -682,6 +681,18 @@ function TripDetail() {
                       />
                     </label>
                   ))}
+                  <StaySearch
+                    address={activePlace.stay_address}
+                    onPick={(r) =>
+                      updatePlace.mutate({
+                        id: activePlace.id,
+                        patch: {
+                          stay_address: r.address,
+                          stay_name: activePlace.stay_name || r.name,
+                        },
+                      })
+                    }
+                  />
                   <div className="grid grid-cols-2 gap-2">
                     {(
                       [
@@ -835,6 +846,84 @@ function ModeToggle({ value, onChange }: { value: TravelMode; onChange: (m: Trav
           <Icon className="size-3.5" /> {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function StaySearch({
+  address,
+  onPick,
+}: {
+  address: string | null;
+  onPick: (r: GeoResult) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [list, setList] = useState<GeoResult[]>([]);
+  async function go() {
+    if (q.trim().length < 2) return;
+    setBusy(true);
+    try {
+      setList(await searchPlaceByName(q.trim()));
+    } catch {
+      toast.error("Search is unavailable right now");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="text-xs text-muted-foreground">
+      Stay location (Google Maps)
+      {address && (
+        <div className="mt-1 rounded-lg border border-border bg-background px-2 py-1.5 text-foreground">
+          {address}{" "}
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-primary underline"
+          >
+            Open in Google Maps
+          </a>
+        </div>
+      )}
+      <div className="mt-1 flex gap-1">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), go())}
+          placeholder="Search hotel by name…"
+          className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+        />
+        <button
+          type="button"
+          onClick={go}
+          disabled={busy}
+          className="rounded-lg bg-primary px-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
+        >
+          {busy ? "…" : "Search"}
+        </button>
+      </div>
+      {list.length > 0 && (
+        <ul className="mt-1 max-h-40 overflow-auto rounded-lg border border-border bg-background">
+          {list.map((r) => (
+            <li key={`${r.lat},${r.lon}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  onPick(r);
+                  setList([]);
+                  setQ("");
+                }}
+                className="block w-full px-2 py-1.5 text-left hover:bg-muted"
+              >
+                <span className="font-medium text-foreground">{r.name}</span>
+                <span className="block truncate">{r.address}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

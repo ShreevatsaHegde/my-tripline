@@ -112,7 +112,7 @@ async function searchPhoton(query: string): Promise<GeoResult[]> {
   const res = await fetch(`https://photon.komoot.io/api/?limit=8&q=${encodeURIComponent(query)}`);
   if (!res.ok) return [];
   const json = (await res.json()) as {
-    features?: { geometry: { coordinates: [number, number] }; properties: Record<string, string> }[];
+    features?: { geometry: { coordinates: [number, number] }; properties: { name?: string; street?: string; city?: string; county?: string; state?: string; country?: string } }[];
   };
   return (json.features ?? []).map((f) => {
     const p = f.properties;

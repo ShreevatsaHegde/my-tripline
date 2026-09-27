@@ -25,6 +25,12 @@ export type Place = {
   photo_url: string | null;
   sort_order: number;
   travel_mode: TravelMode;
+  has_stay: boolean;
+  stay_name: string | null;
+  stay_address: string | null;
+  stay_check_in: string | null;
+  stay_check_out: string | null;
+  stay_notes: string | null;
 };
 
 export type TravelMode = "road" | "flight";
@@ -52,7 +58,7 @@ export async function fetchPlaces(tripId: string): Promise<Place[]> {
   const { data, error } = await supabase
     .from("places")
     .select(
-      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode",
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes",
     )
     .eq("trip_id", tripId)
     .order("sort_order", { ascending: true });
@@ -64,7 +70,7 @@ export async function fetchAllPlaces(): Promise<Place[]> {
   const { data, error } = await supabase
     .from("places")
     .select(
-      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode",
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes",
     )
     .order("sort_order", { ascending: true });
   if (error) throw error;
@@ -102,22 +108,54 @@ export function tripDayCount(trip: Pick<Trip, "start_date" | "end_date">): numbe
 
 export type GeoResult = { name: string; address: string; lat: number; lon: number };
 
-export async function searchPlaceByName(query: string): Promise<GeoResult[]> {
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(query)}`;
+async function searchPhoton(query: string): Promise<GeoResult[]> {
+  const res = await fetch(`https://photon.komoot.io/api/?limit=8&q=${encodeURIComponent(query)}`);
+  if (!res.ok) return [];
+  const json = (await res.json()) as {
+    features?: { geometry: { coordinates: [number, number] }; properties: { name?: string; street?: string; city?: string; county?: string; state?: string; country?: string } }[];
+  };
+  return (json.features ?? []).map((f) => {
+    const p = f.properties;
+    const parts = [p.name, p.street, p.city ?? p.county, p.state, p.country].filter(Boolean);
+    return {
+      name: p.name ?? parts[0] ?? query,
+      address: Array.from(new Set(parts)).join(", "),
+      lat: f.geometry.coordinates[1],
+      lon: f.geometry.coordinates[0],
+    };
+  });
+}
+
+async function searchNominatim(query: string): Promise<GeoResult[]> {
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&accept-language=en&q=${encodeURIComponent(query)}`;
   const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("Place search failed");
-  const rows = (await res.json()) as Array<{
-    display_name: string;
-    name?: string;
-    lat: string;
-    lon: string;
-  }>;
+  if (!res.ok) return [];
+  const rows = (await res.json()) as Array<{ display_name: string; name?: string; lat: string; lon: string }>;
   return rows.map((row) => ({
     name: row.name && row.name.length > 0 ? row.name : row.display_name.split(",")[0]!,
     address: row.display_name,
     lat: Number(row.lat),
     lon: Number(row.lon),
   }));
+}
+
+/** Combines a typo-tolerant search (Photon) with Nominatim so more places are found. */
+export async function searchPlaceByName(query: string): Promise<GeoResult[]> {
+  const [a, b] = await Promise.allSettled([searchPhoton(query), searchNominatim(query)]);
+  const all = [
+    ...(a.status === "fulfilled" ? a.value : []),
+    ...(b.status === "fulfilled" ? b.value : []),
+  ];
+  if (a.status === "rejected" && b.status === "rejected") throw new Error("Place search failed");
+  const seen = new Set<string>();
+  return all
+    .filter((r) => {
+      const k = `${r.lat.toFixed(3)},${r.lon.toFixed(3)}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, 10);
 }
 
 export async function reverseGeocode(lat: number, lon: number): Promise<GeoResult | null> {

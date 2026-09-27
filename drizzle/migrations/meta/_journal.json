@@ -29,6 +29,13 @@
       "when": 1790230225730,
       "tag": "0003_add_place_travel_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790504157239,
+      "tag": "0004_add_place_stay",
+      "breakpoints": true
     }
   ]
 }

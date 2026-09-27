@@ -187,7 +187,7 @@ function TripDetail() {
   });
 
   async function runSearch() {
-    if (query.trim().length < 3) return;
+    if (query.trim().length < 2) return;
     setSearching(true);
     try {
       setResults(await searchPlaceByName(query.trim()));
@@ -649,6 +649,77 @@ function TripDetail() {
                   className="mt-1 w-full resize-none rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
                 />
               </label>
+
+              <label className="mt-3 flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={activePlace.has_stay}
+                  onChange={(e) =>
+                    updatePlace.mutate({ id: activePlace.id, patch: { has_stay: e.target.checked } })
+                  }
+                  className="h-4 w-4 accent-[var(--color-primary)]"
+                />
+                Stay here
+              </label>
+              {activePlace.has_stay && (
+                <div key={activePlace.id} className="mt-2 grid gap-2 rounded-lg border border-border bg-muted/40 p-3">
+                  {(
+                    [
+                      ["stay_name", "Hotel / stay name", "e.g. Hotel Sunrise"],
+                      ["stay_address", "Stay address", "Address or area"],
+                    ] as const
+                  ).map(([field, label, ph]) => (
+                    <label key={field} className="text-xs text-muted-foreground">
+                      {label}
+                      <input
+                        defaultValue={activePlace[field] ?? ""}
+                        placeholder={ph}
+                        onBlur={(e) =>
+                          e.target.value !== (activePlace[field] ?? "") &&
+                          updatePlace.mutate({ id: activePlace.id, patch: { [field]: e.target.value || null } })
+                        }
+                        className="mt-1 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </label>
+                  ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        ["stay_check_in", "Check-in"],
+                        ["stay_check_out", "Check-out"],
+                      ] as const
+                    ).map(([field, label]) => (
+                      <label key={field} className="text-xs text-muted-foreground">
+                        {label}
+                        <input
+                          type="datetime-local"
+                          value={toLocalInput(activePlace[field])}
+                          onChange={(e) =>
+                            updatePlace.mutate({
+                              id: activePlace.id,
+                              patch: { [field]: e.target.value ? new Date(e.target.value).toISOString() : null },
+                            })
+                          }
+                          className="mt-1 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <label className="text-xs text-muted-foreground">
+                    Booking details
+                    <textarea
+                      defaultValue={activePlace.stay_notes ?? ""}
+                      placeholder="Booking ID, price, contact…"
+                      rows={2}
+                      onBlur={(e) =>
+                        e.target.value !== (activePlace.stay_notes ?? "") &&
+                        updatePlace.mutate({ id: activePlace.id, patch: { stay_notes: e.target.value || null } })
+                      }
+                      className="mt-1 w-full resize-none rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </label>
+                </div>
+              )}
 
               {selectedId && (
                 <button

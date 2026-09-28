@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           has_stay: boolean
           id: string
+          kind: string
           latitude: number
           longitude: number
           name: string
@@ -43,6 +44,7 @@ export type Database = {
           created_at?: string
           has_stay?: boolean
           id?: string
+          kind?: string
           latitude: number
           longitude: number
           name: string
@@ -66,6 +68,7 @@ export type Database = {
           created_at?: string
           has_stay?: boolean
           id?: string
+          kind?: string
           latitude?: number
           longitude?: number
           name?: string
@@ -116,6 +119,7 @@ export type Database = {
         Row: {
           completed: boolean
           completed_at: string | null
+          completed_km: number | null
           created_at: string
           description: string | null
           end_date: string | null
@@ -127,6 +131,7 @@ export type Database = {
         Insert: {
           completed?: boolean
           completed_at?: string | null
+          completed_km?: number | null
           created_at?: string
           description?: string | null
           end_date?: string | null
@@ -138,6 +143,7 @@ export type Database = {
         Update: {
           completed?: boolean
           completed_at?: string | null
+          completed_km?: number | null
           created_at?: string
           description?: string | null
           end_date?: string | null

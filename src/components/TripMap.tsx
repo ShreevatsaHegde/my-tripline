@@ -1,18 +1,30 @@
 import { useEffect } from "react";
 import L from "leaflet";
 import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import type { Leg, Place } from "@/lib/trip-api";
+import { PIT_STOP_META, isDestination, type Leg, type Place } from "@/lib/trip-api";
 
-function pinIcon(index: number, visited: boolean, active: boolean) {
-  const color = visited ? "var(--color-visited)" : "var(--color-planned)";
+function pinIcon(label: string, color: string, active: boolean, tag?: string) {
   return L.divIcon({
     className: "",
     iconSize: [32, 32],
     iconAnchor: [16, 30],
-    html: `<div class="map-pin" style="background:${color};outline:${
+    html: `<div style="position:relative">${
+      tag
+        ? `<div class="map-tag" style="background:${tag === "START" ? "#16a34a" : "#dc2626"}">${tag}</div>`
+        : ""
+    }<div class="map-pin" style="background:${color};outline:${
       active ? "3px solid var(--color-primary)" : "none"
-    };outline-offset:2px"><span>${index + 1}</span></div>`,
+    };outline-offset:2px"><span>${label}</span></div></div>`,
   });
+}
+
+function iconFor(place: Place, destNo: number, active: boolean, tag?: string) {
+  if (!isDestination(place)) {
+    const meta = PIT_STOP_META[place.kind as keyof typeof PIT_STOP_META];
+    return pinIcon(meta?.emoji ?? "•", "#64748b", active, tag);
+  }
+  const color = place.visited ? "var(--color-visited)" : "#2563eb";
+  return pinIcon(String(destNo), color, active, tag);
 }
 
 function arrowIcon(angleDeg: number) {
@@ -115,18 +127,24 @@ export default function TripMap({
         );
       })}
 
-      {places.map((place, index) => (
+      {places.map((place, index) => {
+        const destNo = places.slice(0, index + 1).filter(isDestination).length;
+        const tag =
+          places.length > 1 ? (index === 0 ? "START" : index === places.length - 1 ? "END" : undefined) : undefined;
+        return (
         <Marker
           key={place.id}
           position={[place.latitude, place.longitude]}
-          icon={pinIcon(index, place.visited, activeId === place.id)}
+          zIndexOffset={tag ? 1000 : 0}
+          icon={iconFor(place, destNo, activeId === place.id, tag)}
           eventHandlers={{
             mouseover: () => onHover(place.id),
             mouseout: () => onHover(null),
             click: () => onSelect(place.id),
           }}
         />
-      ))}
+        );
+      })}
     </MapContainer>
   );
 }

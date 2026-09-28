@@ -36,6 +36,13 @@
       "when": 1790504157239,
       "tag": "0004_add_place_stay",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790575299835,
+      "tag": "0005_place_kind_and_completed_km",
+      "breakpoints": true
     }
   ]
 }

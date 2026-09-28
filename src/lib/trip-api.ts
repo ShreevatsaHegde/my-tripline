@@ -10,6 +10,7 @@ export type Trip = {
   created_at: string;
   completed: boolean;
   completed_at: string | null;
+  completed_km: number | null;
 };
 
 export type Place = {
@@ -32,14 +33,70 @@ export type Place = {
   stay_check_in: string | null;
   stay_check_out: string | null;
   stay_notes: string | null;
+  kind: PlaceKind;
 };
+
+export type PlaceKind = "destination" | "hotel" | "break" | "fuel";
+export const PIT_STOP_META: Record<Exclude<PlaceKind, "destination">, { label: string; emoji: string }> = {
+  hotel: { label: "Hotel / Stay", emoji: "🏨" },
+  break: { label: "Break", emoji: "☕" },
+  fuel: { label: "Petrol / Fuel", emoji: "⛽" },
+};
+export const isDestination = (p: Pick<Place, "kind">) => (p.kind ?? "destination") === "destination";
+
+export type TripStatus = "planned" | "in_progress" | "completed";
+export function tripStatus(trip: Pick<Trip, "completed">, places: Place[]): TripStatus {
+  if (trip.completed) return "completed";
+  return places.some((p) => isDestination(p) && p.visited) ? "in_progress" : "planned";
+}
+
+/** Google Maps directions URL: first stop = origin, last = destination, rest = waypoints in order. */
+export function googleMapsRouteUrl(places: Place[]): string | null {
+  if (places.length === 0) return null;
+  const ll = (p: Place) => `${p.latitude},${p.longitude}`;
+  if (places.length === 1) return `https://www.google.com/maps/search/?api=1&query=${ll(places[0]!)}`;
+  const origin = ll(places[0]!);
+  const dest = ll(places[places.length - 1]!);
+  const way = places.slice(1, -1).map(ll).join("|");
+  return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${way ? `&waypoints=${encodeURIComponent(way)}` : ""}&travelmode=driving`;
+}
+
+/**
+ * Single source of truth for completion: a trip is completed only when it has at least one
+ * destination and every destination is visited. Pit stops are ignored. The route km is
+ * snapshotted once into completed_km, so the dashboard counts each trip exactly once.
+ */
+export async function syncTripCompletion(tripId: string): Promise<"completed" | "reopened" | null> {
+  const [trip, places] = await Promise.all([fetchTrip(tripId), fetchPlaces(tripId)]);
+  const dests = places.filter(isDestination);
+  const allDone = dests.length > 0 && dests.every((p) => p.visited);
+  if (allDone && !trip.completed) {
+    const legs = await Promise.all(places.slice(1).map((p, i) => fetchLeg(places[i]!, p)));
+    const km = legs.reduce((s, l) => s + l.km, 0);
+    const { error } = await supabase
+      .from("trips")
+      .update({ completed: true, completed_at: new Date().toISOString(), completed_km: km })
+      .eq("id", tripId);
+    if (error) throw error;
+    return "completed";
+  }
+  if (!allDone && trip.completed) {
+    const { error } = await supabase
+      .from("trips")
+      .update({ completed: false, completed_at: null, completed_km: null })
+      .eq("id", tripId);
+    if (error) throw error;
+    return "reopened";
+  }
+  return null;
+}
 
 export type TravelMode = "road" | "flight";
 
 export async function fetchTrips(): Promise<Trip[]> {
   const { data, error } = await supabase
     .from("trips")
-    .select("id, title, description, start_date, end_date, created_at, completed, completed_at")
+    .select("id, title, description, start_date, end_date, created_at, completed, completed_at, completed_km")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
@@ -48,7 +105,7 @@ export async function fetchTrips(): Promise<Trip[]> {
 export async function fetchTrip(id: string): Promise<Trip> {
   const { data, error } = await supabase
     .from("trips")
-    .select("id, title, description, start_date, end_date, created_at, completed, completed_at")
+    .select("id, title, description, start_date, end_date, created_at, completed, completed_at, completed_km")
     .eq("id", id)
     .single();
   if (error) throw error;
@@ -59,7 +116,7 @@ export async function fetchPlaces(tripId: string): Promise<Place[]> {
   const { data, error } = await supabase
     .from("places")
     .select(
-      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes",
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes, kind",
     )
     .eq("trip_id", tripId)
     .order("sort_order", { ascending: true });
@@ -71,7 +128,7 @@ export async function fetchAllPlaces(): Promise<Place[]> {
   const { data, error } = await supabase
     .from("places")
     .select(
-      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes",
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes, kind",
     )
     .order("sort_order", { ascending: true });
   if (error) throw error;

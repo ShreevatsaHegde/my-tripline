@@ -9,6 +9,9 @@ import {
   Camera,
   Check,
   Clock,
+  Copy,
+  GripVertical,
+  Share2,
   Car,
   Loader2,
   Plane,
@@ -19,6 +22,24 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { supabase } from "@/integrations/supabase/client";
 import { PhotoImage } from "@/components/PhotoImage";
 import {
@@ -31,7 +52,20 @@ import {
   tripDayCount,
   fetchLeg,
   type TravelMode,
+  type PlaceKind,
+  PIT_STOP_META,
+  isDestination,
+  tripStatus,
+  googleMapsRouteUrl,
+  syncTripCompletion,
 } from "@/lib/trip-api";
+
+const KIND_OPTIONS: { value: PlaceKind; label: string }[] = [
+  { value: "destination", label: "📍 Destination" },
+  { value: "hotel", label: `${PIT_STOP_META.hotel.emoji} ${PIT_STOP_META.hotel.label}` },
+  { value: "break", label: `${PIT_STOP_META.break.emoji} ${PIT_STOP_META.break.label}` },
+  { value: "fuel", label: `${PIT_STOP_META.fuel.emoji} ${PIT_STOP_META.fuel.label}` },
+];
 
 const TripMap = lazy(() => import("@/components/TripMap"));
 
@@ -77,6 +111,7 @@ function TripDetail() {
     lat: number;
     lon: number;
     plannedAt: string;
+    kind: PlaceKind;
   } | null>(null);
 
   const { data: trip } = useQuery({ queryKey: ["trip", tripId], queryFn: () => fetchTrip(tripId) });
@@ -116,6 +151,7 @@ function TripDetail() {
       lat: number;
       lon: number;
       plannedAt: string;
+      kind: PlaceKind;
     }) => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
@@ -129,10 +165,12 @@ function TripDetail() {
         longitude: input.lon,
         planned_at: input.plannedAt ? new Date(input.plannedAt).toISOString() : null,
         sort_order: places.length,
+        kind: input.kind,
       });
       if (error) throw error;
     },
     onSuccess: () => {
+      void afterRouteChange();
       toast.success("Place added to your route");
       setDraft(null);
       setQuery("");
@@ -143,12 +181,30 @@ function TripDetail() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not add place"),
   });
 
+  async function afterRouteChange() {
+    try {
+      const result = await syncTripCompletion(tripId);
+      if (result === "completed") toast.success("Trip Completed ✓ — all destinations visited");
+      if (result === "reopened") toast("Trip is back in progress");
+    } catch (e) {
+      console.warn("Could not update trip status", e);
+    }
+    queryClient.invalidateQueries({ queryKey: ["places", tripId] });
+    queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
+    queryClient.invalidateQueries({ queryKey: ["trips"] });
+    queryClient.invalidateQueries({ queryKey: ["all-places"] });
+  }
+
   const updatePlace = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<Place> }) => {
       const { error } = await supabase.from("places").update(patch).eq("id", id);
       if (error) throw error;
+      return patch;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["places", tripId] }),
+    onSuccess: (patch) => {
+      if ("visited" in patch || "kind" in patch) void afterRouteChange();
+      else queryClient.invalidateQueries({ queryKey: ["places", tripId] });
+    },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not save"),
   });
 
@@ -175,6 +231,62 @@ function TripDetail() {
       toast.error(error instanceof Error ? error.message : "Could not reorder stops"),
   });
 
+  const [order, setOrder] = useState<string[] | null>(null);
+  const orderedPlaces = order
+    ? (order.map((id) => places.find((p) => p.id === id)).filter(Boolean) as Place[])
+    : places;
+  const reorder = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.all(
+        ids.map((id, i) => supabase.from("places").update({ sort_order: i }).eq("id", id)),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["places", tripId] });
+      setOrder(null);
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not reorder stops"),
+  });
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = orderedPlaces.map((p) => p.id);
+    const next = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+    setOrder(next);
+    reorder.mutate(next);
+  }
+
+  const routeUrl = googleMapsRouteUrl(places);
+  async function shareRoute() {
+    if (!routeUrl) return;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: trip?.title ?? "Trip route", url: routeUrl });
+        return;
+      } catch {
+        /* cancelled — fall through to open */
+      }
+    }
+    window.open(routeUrl, "_blank", "noopener");
+  }
+  async function copyRoute() {
+    if (!routeUrl) return;
+    try {
+      await navigator.clipboard.writeText(routeUrl);
+      toast.success("Google Maps link copied");
+    } catch {
+      toast.error("Could not copy the link");
+    }
+  }
+
   const deletePlace = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("places").delete().eq("id", id);
@@ -182,7 +294,7 @@ function TripDetail() {
     },
     onSuccess: () => {
       setSelectedId(null);
-      queryClient.invalidateQueries({ queryKey: ["places", tripId] });
+      void afterRouteChange();
     },
   });
 
@@ -211,25 +323,12 @@ function TripDetail() {
     }
   }
 
-  const toggleCompleted = useMutation({
-    mutationFn: async (next: boolean) => {
-      const { error } = await supabase
-        .from("trips")
-        .update({ completed: next, completed_at: next ? new Date().toISOString() : null })
-        .eq("id", tripId);
-      if (error) throw error;
-      return next;
-    },
-    onSuccess: (next) => {
-      toast.success(next ? "Trip marked as completed" : "Trip reopened");
-      queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
-      queryClient.invalidateQueries({ queryKey: ["trips"] });
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update"),
-  });
-
-  const visitedPlaces = places.filter((p) => p.visited);
-  const missedPlaces = places.filter((p) => !p.visited);
+  const destinations = places.filter(isDestination);
+  const visitedPlaces = destinations.filter((p) => p.visited);
+  const missedPlaces = destinations.filter((p) => !p.visited);
+  const status = trip ? tripStatus(trip, places) : "planned";
+  const statusLabel =
+    status === "completed" ? "Trip Completed ✓" : status === "in_progress" ? "In Progress" : "Planned";
   const visitedCount = visitedPlaces.length;
   const plannedDays = trip ? tripDayCount(trip) : null;
   const activeDays = new Set(
@@ -250,30 +349,47 @@ function TripDetail() {
           </Link>
           <h1 className="mt-1 text-2xl font-bold">{trip?.title ?? "Trip"}</h1>
           <p className="text-sm text-muted-foreground">
-            {visitedCount} of {places.length} places visited
+            {visitedCount} of {destinations.length} places visited
             {trip ? (tripDayCount(trip) !== null ? ` · ${tripDayCount(trip)} ${tripDayCount(trip) === 1 ? "day" : "days"}` : "") : ""}
             {trip?.start_date ? ` · from ${trip.start_date}` : ""}
             {legs.length > 0 ? ` · ${totalKm.toFixed(1)} km route` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => toggleCompleted.mutate(!trip?.completed)}
-            disabled={!trip || toggleCompleted.isPending}
-            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
-              trip?.completed
-                ? "border-transparent bg-[var(--color-visited)] text-white"
-                : "border-border hover:bg-secondary"
+          <span
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+              status === "completed"
+                ? "bg-[var(--color-visited)] text-white"
+                : status === "in_progress"
+                  ? "bg-[var(--color-planned)] text-white"
+                  : "bg-secondary text-muted-foreground"
             }`}
           >
-            <Check className="size-4" />
-            {trip?.completed ? "Trip completed" : "Mark trip as completed"}
-          </button>
+            {statusLabel}
+          </span>
+          {routeUrl && (
+            <>
+              <button
+                onClick={() => void shareRoute()}
+                className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm font-semibold hover:bg-secondary"
+              >
+                <Share2 className="size-4" /> Share Route
+              </button>
+              <button
+                onClick={() => void copyRoute()}
+                aria-label="Copy Google Maps link"
+                title="Copy Google Maps link"
+                className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm font-semibold hover:bg-secondary"
+              >
+                <Copy className="size-4" /> <span className="hidden sm:inline">Copy Google Maps Link</span>
+              </button>
+            </>
+          )}
           <button
             onClick={() => setAdding((v) => !v)}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            <Plus className="size-4" /> Add place
+            <Plus className="size-4" /> Add stop
           </button>
         </div>
       </div>
@@ -283,12 +399,12 @@ function TripDetail() {
           <h2 className="text-lg font-semibold">Trip summary</h2>
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              trip?.completed
+              status === "completed"
                 ? "bg-[var(--color-visited)] text-white"
                 : "bg-secondary text-muted-foreground"
             }`}
           >
-            {trip?.completed ? "Completed" : "In progress"}
+            {statusLabel}
           </span>
         </div>
 
@@ -307,9 +423,15 @@ function TripDetail() {
           </div>
           <div>
             <p className="text-2xl font-bold">
-              {visitedCount} / {places.length}
+              {visitedCount} / {destinations.length}
             </p>
-            <p className="text-xs text-muted-foreground">places visited</p>
+            <p className="text-xs text-muted-foreground">destinations visited</p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full bg-[var(--color-visited)] transition-all"
+                style={{ width: `${destinations.length ? (visitedCount / destinations.length) * 100 : 0}%` }}
+              />
+            </div>
           </div>
         </div>
 
@@ -426,6 +548,7 @@ function TripDetail() {
                         lat: result.lat,
                         lon: result.lon,
                         plannedAt: "",
+                        kind: draft?.kind ?? "destination",
                       })
                     }
                     className="w-full px-3 py-2.5 text-left text-sm hover:bg-secondary"
@@ -462,6 +585,21 @@ function TripDetail() {
                   className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                 />
               </label>
+              <label className="text-xs font-medium text-muted-foreground sm:col-span-2">
+                Stop type
+                <select
+                  value={draft.kind}
+                  onChange={(e) => setDraft({ ...draft, kind: e.target.value as PlaceKind })}
+                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {KIND_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block">Pit stops (hotel, break, fuel) don't count toward trip completion.</span>
+              </label>
               <p className="text-xs text-muted-foreground sm:col-span-2">{draft.address}</p>
               <button
                 type="submit"
@@ -493,6 +631,7 @@ function TripDetail() {
                     lat,
                     lon: lng,
                     plannedAt: "",
+                    kind: draft?.kind ?? "destination",
                   });
                 }}
               />
@@ -576,7 +715,30 @@ function TripDetail() {
                 </div>
               )}
 
-              <label className="mt-3 flex items-center gap-2 text-sm font-medium">
+              <label className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                Stop type
+                <select
+                  value={activePlace.kind}
+                  onChange={(e) =>
+                    updatePlace.mutate({ id: activePlace.id, patch: { kind: e.target.value as PlaceKind } })
+                  }
+                  className="rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground"
+                >
+                  {KIND_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label
+                className={`mt-3 flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-semibold transition-colors ${
+                  activePlace.visited
+                    ? "border-[var(--color-visited)] bg-[var(--color-visited)]/10 text-[var(--color-visited)]"
+                    : "border-border"
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={activePlace.visited}
@@ -593,7 +755,7 @@ function TripDetail() {
                   }
                   className="size-4 accent-[var(--color-visited)]"
                 />
-                Mark as visited
+                {activePlace.visited ? "✓ Visited" : "○ Not visited — tap to mark as visited"}
               </label>
 
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -752,63 +914,28 @@ function TripDetail() {
             <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               Itinerary
             </h3>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={orderedPlaces.map((p) => p.id)} strategy={verticalListSortingStrategy}>
             <ul className="mt-3 space-y-2">
-              {places.map((place, index) => (
-                <li key={place.id} className="flex items-center gap-1.5">
-                  <button
-                    onMouseEnter={() => setHoveredId(place.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    onClick={() => setSelectedId(place.id)}
-                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border p-2.5 text-left transition-colors ${
-                      highlightId === place.id
-                        ? "border-primary bg-secondary/50"
-                        : "border-border hover:bg-secondary/40"
-                    }`}
-                  >
-                    <span
-                      className="grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white"
-                      style={{
-                        background: place.visited
-                          ? "var(--color-visited)"
-                          : "var(--color-planned)",
-                      }}
-                    >
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{place.name}</span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="size-3" />
-                        {place.visited
-                          ? place.visited_at
-                            ? new Date(place.visited_at).toLocaleString()
-                            : "Visited"
-                          : "Planned"}
-                      </span>
-                    </span>
-                    {place.photo_url && <Camera className="size-3.5 text-muted-foreground" />}
-                  </button>
-                  <span className="flex shrink-0 flex-col gap-0.5">
-                    <button
-                      onClick={() => movePlace.mutate({ id: place.id, dir: -1 })}
-                      disabled={index === 0 || movePlace.isPending}
-                      aria-label={`Move ${place.name} earlier`}
-                      title="Move earlier in the route"
-                      className="grid size-6 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-30"
-                    >
-                      <ArrowUp className="size-3.5" />
-                    </button>
-                    <button
-                      onClick={() => movePlace.mutate({ id: place.id, dir: 1 })}
-                      disabled={index === places.length - 1 || movePlace.isPending}
-                      aria-label={`Move ${place.name} later`}
-                      title="Move later in the route"
-                      className="grid size-6 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-30"
-                    >
-                      <ArrowDown className="size-3.5" />
-                    </button>
-                  </span>
-                </li>
+              {orderedPlaces.map((place, index) => (
+                <SortableStop
+                  key={place.id}
+                  place={place}
+                  index={index}
+                  total={orderedPlaces.length}
+                  destNo={orderedPlaces.slice(0, index + 1).filter(isDestination).length}
+                  highlighted={highlightId === place.id}
+                  onHover={setHoveredId}
+                  onSelect={setSelectedId}
+                  onMove={(dir) => movePlace.mutate({ id: place.id, dir })}
+                  moving={movePlace.isPending || reorder.isPending}
+                  onToggleVisited={(v) =>
+                    updatePlace.mutate({
+                      id: place.id,
+                      patch: { visited: v, visited_at: v ? (place.visited_at ?? new Date().toISOString()) : null },
+                    })
+                  }
+                />
               ))}
               {places.length === 0 && (
                 <li className="text-sm text-muted-foreground">
@@ -816,8 +943,10 @@ function TripDetail() {
                 </li>
               )}
             </ul>
+            </SortableContext>
+            </DndContext>
             <p className="mt-4 text-[10px] text-muted-foreground">
-              Tip: arrows on the map show the order you travel from stop 1 onwards.
+              Tip: drag ☰ to reorder. START and END on the map mark the first and last stop.
             </p>
           </div>
         </aside>
@@ -925,5 +1054,126 @@ function StaySearch({
         </ul>
       )}
     </div>
+  );
+}
+
+function SortableStop({
+  place,
+  index,
+  total,
+  destNo,
+  highlighted,
+  onHover,
+  onSelect,
+  onMove,
+  moving,
+  onToggleVisited,
+}: {
+  place: Place;
+  index: number;
+  total: number;
+  destNo: number;
+  highlighted: boolean;
+  onHover: (id: string | null) => void;
+  onSelect: (id: string) => void;
+  onMove: (dir: -1 | 1) => void;
+  moving: boolean;
+  onToggleVisited: (v: boolean) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: place.id,
+  });
+  const dest = isDestination(place);
+  const pit = !dest ? PIT_STOP_META[place.kind as keyof typeof PIT_STOP_META] : null;
+  const tag = total > 1 ? (index === 0 ? "START" : index === total - 1 ? "END" : null) : null;
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`flex items-center gap-1.5 ${isDragging ? "z-10 opacity-80 shadow-lg" : ""}`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        aria-label={`Drag ${place.name}`}
+        className="grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground hover:bg-secondary active:cursor-grabbing"
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <button
+        onMouseEnter={() => onHover(place.id)}
+        onMouseLeave={() => onHover(null)}
+        onClick={() => onSelect(place.id)}
+        className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border p-2.5 text-left transition-colors ${
+          highlighted ? "border-primary bg-secondary/50" : "border-border hover:bg-secondary/40"
+        } ${!dest ? "border-dashed" : ""}`}
+      >
+        <span
+          className="grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white"
+          style={{
+            background: !dest ? "#64748b" : place.visited ? "var(--color-visited)" : "#2563eb",
+          }}
+        >
+          {pit ? pit.emoji : destNo}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            {tag && (
+              <span
+                className={`rounded px-1 text-[9px] font-bold text-white ${
+                  tag === "START" ? "bg-green-600" : "bg-red-600"
+                }`}
+              >
+                {tag}
+              </span>
+            )}
+            <span className="block truncate text-sm font-semibold">{place.name}</span>
+          </span>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="size-3" />
+            {pit
+              ? `Pit stop · ${pit.label}`
+              : place.visited
+                ? place.visited_at
+                  ? `✓ ${new Date(place.visited_at).toLocaleString()}`
+                  : "✓ Visited"
+                : "○ Not visited"}
+          </span>
+        </span>
+        {place.photo_url && <Camera className="size-3.5 text-muted-foreground" />}
+      </button>
+      {dest && (
+        <button
+          onClick={() => onToggleVisited(!place.visited)}
+          aria-label={place.visited ? `Mark ${place.name} not visited` : `Mark ${place.name} visited`}
+          title={place.visited ? "Mark as not visited" : "Mark as visited"}
+          className={`grid size-8 shrink-0 place-items-center rounded-lg border transition-colors ${
+            place.visited
+              ? "border-transparent bg-[var(--color-visited)] text-white"
+              : "border-border text-muted-foreground hover:bg-secondary"
+          }`}
+        >
+          <Check className="size-4" />
+        </button>
+      )}
+      <span className="flex shrink-0 flex-col gap-0.5">
+        <button
+          onClick={() => onMove(-1)}
+          disabled={index === 0 || moving}
+          aria-label={`Move ${place.name} earlier`}
+          className="grid size-6 place-items-center rounded-md border border-border text-muted-foreground hover:bg-secondary disabled:opacity-30"
+        >
+          <ArrowUp className="size-3.5" />
+        </button>
+        <button
+          onClick={() => onMove(1)}
+          disabled={index === total - 1 || moving}
+          aria-label={`Move ${place.name} later`}
+          className="grid size-6 place-items-center rounded-md border border-border text-muted-foreground hover:bg-secondary disabled:opacity-30"
+        >
+          <ArrowDown className="size-3.5" />
+        </button>
+      </span>
+    </li>
   );
 }

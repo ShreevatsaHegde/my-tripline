@@ -195,3 +195,17 @@
     0 0 2px var(--color-card),
     0 0 4px var(--color-card);
 }
+
+.map-tag {
+  position: absolute;
+  bottom: 34px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #fff;
+  font: 700 10px/1.4 system-ui, sans-serif;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}

@@ -1,4 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { syncTripCompletion } from "@/lib/trip-api";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, MapIcon, Repeat, Route } from "lucide-react";
 import { fetchAllPlaces, isDestination, type Place, type Trip } from "@/lib/trip-api";
@@ -15,6 +17,14 @@ function formatWhen(value: string | null) {
 
 export function TripDashboard({ trips }: { trips: Trip[] }) {
   const { data: places } = useQuery({ queryKey: ["all-places"], queryFn: fetchAllPlaces });
+  const qc = useQueryClient();
+  const missingKm = trips.filter((t) => t.completed && t.completed_km == null).map((t) => t.id).join(",");
+  useEffect(() => {
+    if (!missingKm) return;
+    Promise.all(missingKm.split(",").map((id) => syncTripCompletion(id).catch(() => null))).then(() =>
+      qc.invalidateQueries({ queryKey: ["trips"] }),
+    );
+  }, [missingKm, qc]);
 
   const all: Place[] = places ?? [];
   const dests = all.filter(isDestination);

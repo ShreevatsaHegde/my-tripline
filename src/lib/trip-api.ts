@@ -70,6 +70,14 @@ export async function syncTripCompletion(tripId: string): Promise<"completed" | 
   const [trip, places] = await Promise.all([fetchTrip(tripId), fetchPlaces(tripId)]);
   const dests = places.filter(isDestination);
   const allDone = dests.length > 0 && dests.every((p) => p.visited);
+  if (allDone && trip.completed && trip.completed_km == null) {
+    // Backfill trips completed before distances were saved.
+    const legs = await Promise.all(places.slice(1).map((p, i) => fetchLeg(places[i]!, p)));
+    const km = legs.reduce((s, l) => s + l.km, 0);
+    const { error } = await supabase.from("trips").update({ completed_km: km }).eq("id", tripId);
+    if (error) throw error;
+    return null;
+  }
   if (allDone && !trip.completed) {
     const legs = await Promise.all(places.slice(1).map((p, i) => fetchLeg(places[i]!, p)));
     const km = legs.reduce((s, l) => s + l.km, 0);

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, MapIcon, Repeat, Route } from "lucide-react";
-import { fetchAllPlaces, fetchLeg, type Place, type Trip } from "@/lib/trip-api";
+import { fetchAllPlaces, isDestination, type Place, type Trip } from "@/lib/trip-api";
 
 function formatWhen(value: string | null) {
   if (!value) return "no time noted";
@@ -46,7 +46,7 @@ export function TripDashboard({ trips }: { trips: Trip[] }) {
     { label: "Trips completed", value: `${tripsDone} / ${trips.length}`, icon: CheckCircle2 },
     { label: "Places visited", value: `${visited.length}`, icon: MapIcon },
     { label: "Kilometres travelled", value: `${totalKm.toFixed(1)} km`, icon: Route },
-    { label: "Places planned", value: `${all.length}`, icon: Repeat },
+    { label: "Places planned", value: `${dests.length}`, icon: Repeat },
   ];
 
   return (

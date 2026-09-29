@@ -1,7 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { syncTripCompletion } from "@/lib/trip-api";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, MapIcon, Repeat, Route } from "lucide-react";
-import { fetchAllPlaces, fetchLeg, type Place, type Trip } from "@/lib/trip-api";
+import { fetchAllPlaces, isDestination, type Place, type Trip } from "@/lib/trip-api";
 
 function formatWhen(value: string | null) {
   if (!value) return "no time noted";
@@ -15,33 +17,23 @@ function formatWhen(value: string | null) {
 
 export function TripDashboard({ trips }: { trips: Trip[] }) {
   const { data: places } = useQuery({ queryKey: ["all-places"], queryFn: fetchAllPlaces });
+  const qc = useQueryClient();
+  const missingKm = trips.filter((t) => t.completed && t.completed_km == null).map((t) => t.id).join(",");
+  useEffect(() => {
+    if (!missingKm) return;
+    Promise.all(missingKm.split(",").map((id) => syncTripCompletion(id).catch(() => null))).then(() =>
+      qc.invalidateQueries({ queryKey: ["trips"] }),
+    );
+  }, [missingKm, qc]);
 
   const all: Place[] = places ?? [];
-  const visited = all.filter((p) => p.visited);
+  const dests = all.filter(isDestination);
+  const visited = dests.filter((p) => p.visited);
   const tripTitle = new Map(trips.map((t) => [t.id, t.title]));
 
-  // Total distance honours each leg's road/flight choice (road = real road distance).
-  const legsKey = all.map((p) => `${p.id}:${p.latitude},${p.longitude}:${p.travel_mode}`).join("|");
-  const { data: totalKm = 0 } = useQuery({
-    queryKey: ["dashboard-legs", legsKey],
-    queryFn: async () => {
-      let sum = 0;
-      for (const trip of trips) {
-        const own = all.filter((p) => p.trip_id === trip.id);
-        const legs = await Promise.all(own.slice(1).map((p, i) => fetchLeg(own[i]!, p)));
-        sum += legs.reduce((s, l) => s + l.km, 0);
-      }
-      return sum;
-    },
-    staleTime: 60 * 60 * 1000,
-    enabled: all.length > 1,
-  });
-
-  const tripsDone = trips.filter((t) => {
-    if (t.completed) return true;
-    const own = all.filter((p) => p.trip_id === t.id);
-    return own.length > 0 && own.every((p) => p.visited);
-  }).length;
+  // Kilometres come only from completed trips, using the distance saved once at completion.
+  const totalKm = trips.reduce((s, t) => s + (t.completed ? (t.completed_km ?? 0) : 0), 0);
+  const tripsDone = trips.filter((t) => t.completed).length;
 
   const recent = [...visited]
     .sort((a, b) => (b.visited_at ?? "").localeCompare(a.visited_at ?? ""))
@@ -64,7 +56,7 @@ export function TripDashboard({ trips }: { trips: Trip[] }) {
     { label: "Trips completed", value: `${tripsDone} / ${trips.length}`, icon: CheckCircle2 },
     { label: "Places visited", value: `${visited.length}`, icon: MapIcon },
     { label: "Kilometres travelled", value: `${totalKm.toFixed(1)} km`, icon: Route },
-    { label: "Places planned", value: `${all.length}`, icon: Repeat },
+    { label: "Places planned", value: `${dests.length}`, icon: Repeat },
   ];
 
   return (

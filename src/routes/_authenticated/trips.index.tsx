@@ -1,7 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { CalendarDays, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, MapPin, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTrips, tripDayCount, type Trip } from "@/lib/trip-api";
@@ -253,14 +259,15 @@ function TripsPage() {
                 key={trip.id}
                 className="group rounded-2xl border border-border bg-card p-5 shadow-soft transition-shadow hover:shadow-lift"
               >
-                <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="block">
+                <div className="flex items-start justify-between gap-2">
+                <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="block min-w-0 flex-1">
                   <h2 className="text-lg font-semibold group-hover:text-primary">{trip.title}</h2>
                   {trip.description && (
                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                       {trip.description}
                     </p>
                   )}
-                  <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <CalendarDays className="size-3.5" />
                       {trip.start_date ?? "No dates yet"}
@@ -271,31 +278,38 @@ function TripsPage() {
                         {tripDayCount(trip)} {tripDayCount(trip) === 1 ? "day" : "days"}
                       </span>
                     )}
+                    {trip.completed && <span className="font-medium text-primary">Completed ✓</span>}
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="size-3.5" /> Open map
                     </span>
                   </div>
                 </Link>
-                <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
-                  <button
-                    onClick={() => startEdit(trip)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-secondary"
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    aria-label="Trip options"
+                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary"
                   >
-                    <Pencil className="size-3.5" /> Edit
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (
-                        window.confirm(`Delete "${trip.title}" and all its places? This cannot be undone.`)
-                      ) {
-                        deleteTrip.mutate(trip.id);
-                      }
-                    }}
-                    disabled={deleteTrip.isPending}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
-                  >
-                    <Trash2 className="size-3.5" /> Delete
-                  </button>
+                    <MoreVertical className="size-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => startEdit(trip)}>
+                      <Pencil className="size-3.5" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      disabled={deleteTrip.isPending}
+                      onClick={() => {
+                        if (
+                          window.confirm(`Delete "${trip.title}" and all its places? This cannot be undone.`)
+                        ) {
+                          deleteTrip.mutate(trip.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-3.5" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 </div>
               </div>
             ),

@@ -34,14 +34,19 @@ export type Place = {
   stay_check_out: string | null;
   stay_notes: string | null;
   kind: PlaceKind;
+  route_choice: number;
+  day_number: number | null;
 };
 
-export type PlaceKind = "destination" | "hotel" | "break" | "fuel";
+export type PlaceKind = "destination" | "hotel" | "break" | "fuel" | "start" | "end";
 export const PIT_STOP_META: Record<Exclude<PlaceKind, "destination">, { label: string; emoji: string }> = {
   hotel: { label: "Hotel / Stay", emoji: "🏨" },
   break: { label: "Break", emoji: "☕" },
   fuel: { label: "Petrol / Fuel", emoji: "⛽" },
+  start: { label: "Start point", emoji: "🚩" },
+  end: { label: "End point", emoji: "🏁" },
 };
+export const isEndpoint = (p: Pick<Place, "kind">) => p.kind === "start" || p.kind === "end";
 export const isDestination = (p: Pick<Place, "kind">) => (p.kind ?? "destination") === "destination";
 
 export type TripStatus = "planned" | "in_progress" | "completed";
@@ -51,13 +56,23 @@ export function tripStatus(trip: Pick<Trip, "completed">, places: Place[]): Trip
 }
 
 /** Google Maps directions URL: first stop = origin, last = destination, rest = waypoints in order. */
-export function googleMapsRouteUrl(places: Place[]): string | null {
+export function googleMapsRouteUrl(places: Place[], legs: Leg[] = []): string | null {
   if (places.length === 0) return null;
   const ll = (p: Place) => `${p.latitude},${p.longitude}`;
   if (places.length === 1) return `https://www.google.com/maps/search/?api=1&query=${ll(places[0]!)}`;
   const origin = ll(places[0]!);
   const dest = ll(places[places.length - 1]!);
-  const way = places.slice(1, -1).map(ll).join("|");
+  // A chosen alternative road is forced by adding its midpoint as an extra waypoint before the stop.
+  const pts: string[] = [];
+  places.slice(1).forEach((p, i) => {
+    const leg = legs.find((l) => l.toId === p.id);
+    if (leg && leg.choice > 0 && leg.coords.length > 2) {
+      const [la, lo] = leg.coords[Math.floor(leg.coords.length / 2)]!;
+      pts.push(`${la.toFixed(5)},${lo.toFixed(5)}`);
+    }
+    if (i < places.length - 2) pts.push(ll(p));
+  });
+  const way = pts.join("|");
   return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${way ? `&waypoints=${encodeURIComponent(way)}` : ""}&travelmode=driving`;
 }
 
@@ -124,7 +139,7 @@ export async function fetchPlaces(tripId: string): Promise<Place[]> {
   const { data, error } = await supabase
     .from("places")
     .select(
-      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes, kind",
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes, kind, route_choice, day_number",
     )
     .eq("trip_id", tripId)
     .order("sort_order", { ascending: true });
@@ -136,7 +151,7 @@ export async function fetchAllPlaces(): Promise<Place[]> {
   const { data, error } = await supabase
     .from("places")
     .select(
-      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes, kind",
+      "id, trip_id, name, address, latitude, longitude, visited, visited_at, planned_at, notes, photo_url, sort_order, travel_mode, has_stay, stay_name, stay_address, stay_check_in, stay_check_out, stay_notes, kind, route_choice, day_number",
     )
     .order("sort_order", { ascending: true });
   if (error) throw error;
@@ -267,6 +282,8 @@ export type Leg = {
   km: number;
   coords: [number, number][];
   road: boolean; // true when a real road path was found
+  choice: number; // index of the selected alternative
+  alternatives: { km: number; coords: [number, number][] }[];
 };
 
 /** Road route between two points via the free OSRM service; falls back to a straight line. */
@@ -281,23 +298,24 @@ export async function fetchLeg(a: Place, b: Place): Promise<Leg> {
       [b.latitude, b.longitude],
     ],
     road: false,
+    choice: 0,
+    alternatives: [],
   };
   if (b.travel_mode === "flight") return straight;
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${a.longitude},${a.latitude};${b.longitude},${b.latitude}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${a.longitude},${a.latitude};${b.longitude},${b.latitude}?overview=full&geometries=geojson&alternatives=3`;
     const res = await fetch(url);
     if (!res.ok) return straight;
     const json = (await res.json()) as {
       routes?: { distance: number; geometry: { coordinates: [number, number][] } }[];
     };
-    const r = json.routes?.[0];
-    if (!r) return straight;
-    return {
-      ...straight,
+    const alts = (json.routes ?? []).map((r) => ({
       km: r.distance / 1000,
       coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
-      road: true,
-    };
+    }));
+    if (alts.length === 0) return straight;
+    const choice = Math.min(Math.max(b.route_choice ?? 0, 0), alts.length - 1);
+    return { ...straight, ...alts[choice]!, road: true, choice, alternatives: alts };
   } catch {
     return straight;
   }

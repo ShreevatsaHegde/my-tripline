@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
+          day_number: number | null
           has_stay: boolean
           id: string
           kind: string
@@ -27,6 +28,7 @@ export type Database = {
           notes: string | null
           photo_url: string | null
           planned_at: string | null
+          route_choice: number
           sort_order: number
           stay_address: string | null
           stay_check_in: string | null
@@ -42,6 +44,7 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
+          day_number?: number | null
           has_stay?: boolean
           id?: string
           kind?: string
@@ -51,6 +54,7 @@ export type Database = {
           notes?: string | null
           photo_url?: string | null
           planned_at?: string | null
+          route_choice?: number
           sort_order?: number
           stay_address?: string | null
           stay_check_in?: string | null
@@ -66,6 +70,7 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
+          day_number?: number | null
           has_stay?: boolean
           id?: string
           kind?: string
@@ -75,6 +80,7 @@ export type Database = {
           notes?: string | null
           photo_url?: string | null
           planned_at?: string | null
+          route_choice?: number
           sort_order?: number
           stay_address?: string | null
           stay_check_in?: string | null

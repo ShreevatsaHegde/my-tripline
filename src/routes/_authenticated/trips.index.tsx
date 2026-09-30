@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { CalendarDays, MapPin, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, MapPin, MoreVertical, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -131,12 +131,20 @@ function TripsPage() {
             Open a trip to see its map, route and the places you have visited.
           </p>
         </div>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          <Plus className="size-4" /> New trip
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/trips/plan"
+            className="inline-flex items-center gap-2 rounded-xl border border-primary px-4 py-2.5 text-sm font-semibold text-primary hover:bg-secondary"
+          >
+            <Sparkles className="size-4" /> Plan My Trip with AI
+          </Link>
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus className="size-4" /> New trip
+          </button>
+        </div>
       </div>
 
       {open && (

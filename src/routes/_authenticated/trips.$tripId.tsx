@@ -62,6 +62,8 @@ import {
 
 const KIND_OPTIONS: { value: PlaceKind; label: string }[] = [
   { value: "destination", label: "📍 Destination" },
+  { value: "start", label: "🚩 Start point" },
+  { value: "end", label: "🏁 End point" },
   { value: "hotel", label: `${PIT_STOP_META.hotel.emoji} ${PIT_STOP_META.hotel.label}` },
   { value: "break", label: `${PIT_STOP_META.break.emoji} ${PIT_STOP_META.break.label}` },
   { value: "fuel", label: `${PIT_STOP_META.fuel.emoji} ${PIT_STOP_META.fuel.label}` },
@@ -120,7 +122,7 @@ function TripDetail() {
     queryFn: () => fetchPlaces(tripId),
   });
 
-  const legKey = places.map((p) => `${p.id}:${p.latitude},${p.longitude}:${p.travel_mode}`).join("|");
+  const legKey = places.map((p) => `${p.id}:${p.latitude},${p.longitude}:${p.travel_mode}:${p.route_choice}`).join("|");
   const { data: legs = [] } = useQuery({
     queryKey: ["legs", legKey],
     queryFn: () => Promise.all(places.slice(1).map((p, i) => fetchLeg(places[i]!, p))),
@@ -128,6 +130,8 @@ function TripDetail() {
     enabled: places.length > 1,
   });
   const totalKm = legs.reduce((sum, l) => sum + l.km, 0);
+  const setRoute = (id: string, choice: number) =>
+    updatePlace.mutate({ id, patch: { route_choice: choice } });
   const setMode = (id: string, mode: TravelMode) =>
     updatePlace.mutate({ id, patch: { travel_mode: mode } });
 
@@ -264,7 +268,7 @@ function TripDetail() {
     reorder.mutate(next);
   }
 
-  const routeUrl = googleMapsRouteUrl(places);
+  const routeUrl = googleMapsRouteUrl(places, legs);
   async function shareRoute() {
     if (!routeUrl) return;
     if (typeof navigator !== "undefined" && navigator.share) {
@@ -501,6 +505,29 @@ function TripDetail() {
                       </span>
                     </span>
                     <ModeToggle value={to.travel_mode} onChange={(m) => setMode(to.id, m)} />
+                    {leg.alternatives.length > 1 && (
+                      <div className="w-full">
+                        <p className="text-xs text-muted-foreground">
+                          Choose the road you travelled (or tap a grey road on the map):
+                        </p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {leg.alternatives.map((alt, ai) => (
+                            <button
+                              key={ai}
+                              onClick={() => setRoute(to.id, ai)}
+                              className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                                leg.choice === ai
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border hover:bg-secondary"
+                              }`}
+                            >
+                              {leg.choice === ai ? "Selected Route ✓ " : "Select Route "}
+                              {String.fromCharCode(65 + ai)} · {alt.km.toFixed(1)} km
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </li>
                 );
               })}
@@ -623,6 +650,7 @@ function TripDetail() {
                 activeId={highlightId}
                 onHover={setHoveredId}
                 onSelect={setSelectedId}
+                onSelectRoute={setRoute}
                 onMapClick={(lat, lng) => {
                   setAdding(true);
                   setDraft({
@@ -1085,7 +1113,18 @@ function SortableStop({
   });
   const dest = isDestination(place);
   const pit = !dest ? PIT_STOP_META[place.kind as keyof typeof PIT_STOP_META] : null;
-  const tag = total > 1 ? (index === 0 ? "START" : index === total - 1 ? "END" : null) : null;
+  const tag =
+    place.kind === "start"
+      ? "START"
+      : place.kind === "end"
+        ? "END"
+        : total > 1
+          ? index === 0
+            ? "START"
+            : index === total - 1
+              ? "END"
+              : null
+          : null;
   return (
     <li
       ref={setNodeRef}

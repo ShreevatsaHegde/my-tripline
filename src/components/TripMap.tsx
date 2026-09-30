@@ -19,6 +19,9 @@ function pinIcon(label: string, color: string, active: boolean, tag?: string) {
 }
 
 function iconFor(place: Place, destNo: number, active: boolean, tag?: string) {
+  if (place.kind === "start" || place.kind === "end") {
+    return pinIcon(place.kind === "start" ? "🚩" : "🏁", place.kind === "start" ? "#16a34a" : "#dc2626", active, tag);
+  }
   if (!isDestination(place)) {
     const meta = PIT_STOP_META[place.kind as keyof typeof PIT_STOP_META];
     return pinIcon(meta?.emoji ?? "•", "#64748b", active, tag);
@@ -75,7 +78,9 @@ export default function TripMap({
   onHover,
   onSelect,
   onMapClick,
+  onSelectRoute,
 }: {
+  onSelectRoute?: (toId: string, choice: number) => void;
   places: Place[];
   legs: Leg[];
   activeId: string | null;
@@ -100,6 +105,25 @@ export default function TripMap({
       />
       <FitBounds places={places} />
       <ClickCapture onMapClick={onMapClick} />
+      {legs.flatMap((leg) =>
+        leg.alternatives.length > 1
+          ? leg.alternatives.map((alt, ai) =>
+              ai === leg.choice ? null : (
+                <Polyline
+                  key={`alt-${leg.toId}-${ai}`}
+                  positions={alt.coords}
+                  pathOptions={{ color: "#64748b", weight: 6, opacity: 0.45, dashArray: "6 8" }}
+                  eventHandlers={{
+                    click: (e) => {
+                      L.DomEvent.stopPropagation(e);
+                      onSelectRoute?.(leg.toId, ai);
+                    },
+                  }}
+                />
+              ),
+            )
+          : [],
+      )}
       {legs.map((leg) => (
         <Polyline
           key={`leg-${leg.fromId}-${leg.toId}`}
@@ -130,6 +154,7 @@ export default function TripMap({
       {places.map((place, index) => {
         const destNo = places.slice(0, index + 1).filter(isDestination).length;
         const tag =
+          place.kind === "start" ? "START" : place.kind === "end" ? "END" :
           places.length > 1 ? (index === 0 ? "START" : index === places.length - 1 ? "END" : undefined) : undefined;
         return (
         <Marker

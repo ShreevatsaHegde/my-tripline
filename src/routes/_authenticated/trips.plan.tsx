@@ -69,7 +69,7 @@ function PlanPage() {
   const [q, setQ] = useState("");
 
   async function run() {
-    if (!form.start.trim()) return toast.error("Enter a starting location");
+    if (!form.start.trim()) { toast.error("Enter a starting location"); return; }
     setLoading(true);
     try {
       const p = await generate({ data: form });
@@ -127,7 +127,7 @@ function PlanPage() {
     if (q.trim().length < 2) return;
     try {
       const r = (await searchPlaceByName(q))[0];
-      if (!r) return toast.error("Place not found");
+      if (!r) { toast.error("Place not found"); return; }
       const lastDay = rows.at(-1)?.day ?? 1;
       const row: Row = { key: crypto.randomUUID(), name: r.name, address: r.address, lat: r.lat, lon: r.lon, kind: "destination", day: lastDay, notes: "" };
       setRows((rs) => {
@@ -143,7 +143,7 @@ function PlanPage() {
 
   async function save() {
     const usable = rows.filter((r) => r.lat != null && r.lon != null);
-    if (usable.length === 0) return toast.error("Add at least one place with a map location");
+    if (usable.length === 0) { toast.error("Add at least one place with a map location"); return; }
     setSaving(true);
     try {
       const { data: u } = await supabase.auth.getUser();

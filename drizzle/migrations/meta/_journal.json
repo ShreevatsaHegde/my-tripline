@@ -43,6 +43,13 @@
       "when": 1790575299835,
       "tag": "0005_place_kind_and_completed_km",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790743050333,
+      "tag": "0006_start_end_and_route_choice",
+      "breakpoints": true
     }
   ]
 }

@@ -3,15 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const InputSchema = z.object({
-  start: z.string().trim().min(1).max(200),
-  end: z.string().trim().max(200).optional().default(""),
-  destination: z.string().trim().max(300).optional().default(""),
+  prompt: z.string().trim().min(5).max(2000),
   startDate: z.string().max(20).optional().default(""),
-  days: z.number().int().min(1).max(30),
-  people: z.string().max(50).optional().default(""),
-  preferences: z.string().max(1000).optional().default(""),
-  interests: z.string().max(1000).optional().default(""),
-  budget: z.string().max(100).optional().default(""),
 });
 
 export type AiStop = {
@@ -26,11 +19,11 @@ export type AiStop = {
 };
 export type AiPlan = { title: string; summary: string; itinerary: string; stops: AiStop[] };
 
-const SYSTEM = `You are a practical road-trip planner. Return ONLY a JSON object, no markdown, with this shape:
+const SYSTEM = `You are a practical road-trip planner. The user describes their trip in free text (e.g. "plan trip from sirsi to gokarna for 2 days"). Extract the start location, end location, number of days and any preferences from their message. If the end is not mentioned, make it a round trip back to the start. If days are not mentioned, choose a realistic number. Return ONLY a JSON object, no markdown, with this shape:
 {"title": string, "summary": string (2-3 sentences),
  "itinerary": string (plain-text day-by-day plan: "Day 1: START → A → B → Hotel" lines, each followed by short bullet lines for activities, food/rest breaks, approx distances and travel times),
  "stops": [{"name": string (real searchable place name), "region": string (district/state/country), "kind": "start"|"end"|"destination"|"hotel"|"break"|"fuel", "day": number, "activities": string (short), "travel": string (approx km and time from previous stop), "lat": number, "lon": number}]}
-Rules: stops are in travel order. The first stop has kind "start" and the last has kind "end" (even if it is the same place as the start). Real places to visit are "destination". Add a "hotel" stop at the end of each day except the last, and add meal/rest "break" or "fuel" stops where sensible. Keep it realistic for the given days. Coordinates approximate.`;
+Rules: stops are in travel order. The first stop has kind "start" and the last has kind "end" (even if it is the same place as the start). Real places to visit are "destination". Add a "hotel" stop at the end of each day except the last, and add meal/rest "break" or "fuel" stops where sensible. Keep it realistic for the number of days. Coordinates approximate.`;
 
 export const generateTripPlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

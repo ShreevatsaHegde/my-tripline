@@ -49,17 +49,8 @@ function PlanPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const generate = useServerFn(generateTripPlan);
-  const [form, setForm] = useState({
-    start: "",
-    end: "",
-    destination: "",
-    startDate: "",
-    days: 3,
-    people: "",
-    preferences: "",
-    interests: "",
-    budget: "",
-  });
+  const [prompt, setPrompt] = useState("");
+  const [startDate, setStartDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<AiPlan | null>(null);
   const [title, setTitle] = useState("");
@@ -69,10 +60,10 @@ function PlanPage() {
   const [q, setQ] = useState("");
 
   async function run() {
-    if (!form.start.trim()) { toast.error("Enter a starting location"); return; }
+    if (prompt.trim().length < 5) { toast.error("Describe your trip, e.g. \"plan trip from sirsi to gokarna for 2 days\""); return; }
     setLoading(true);
     try {
-      const p = await generate({ data: form });
+      const p = await generate({ data: { prompt: prompt.trim(), startDate } });
       // Look up real map positions for each stop, keeping the AI's position as a fallback.
       const located = await Promise.all(
         p.stops.map(async (s, i) => {
@@ -149,16 +140,17 @@ function PlanPage() {
       const { data: u } = await supabase.auth.getUser();
       const userId = u.user?.id;
       if (!userId) throw new Error("Not signed in");
+      const tripDays = Math.max(1, ...usable.map((r) => r.day));
       const end =
-        form.startDate &&
-        new Date(new Date(form.startDate).getTime() + (form.days - 1) * 86_400_000).toISOString().slice(0, 10);
+        startDate &&
+        new Date(new Date(startDate).getTime() + (tripDays - 1) * 86_400_000).toISOString().slice(0, 10);
       const { data: trip, error } = await supabase
         .from("trips")
         .insert({
           user_id: userId,
           title: title || "AI trip",
           description: [plan?.summary, itinerary].filter(Boolean).join("\n\n") || null,
-          start_date: form.startDate || null,
+          start_date: startDate || null,
           end_date: end || null,
         })
         .select("id")
@@ -202,42 +194,32 @@ function PlanPage() {
         Describe your trip. You can review and change everything before it is saved.
       </p>
 
-      <div className="mt-6 grid gap-3 rounded-2xl border border-border bg-card p-5 shadow-soft sm:grid-cols-2">
-        <label className="text-sm">Starting location *
-          <input className={input} value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} placeholder="Sirsi" />
+      <div className="mt-6 space-y-3 rounded-2xl border border-border bg-card p-5 shadow-soft">
+        <label className="block text-sm font-semibold">Describe your trip
+          <textarea
+            rows={3}
+            className={input}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder='e.g. "Plan a trip from Sirsi to Gokarna for 2 days" or "3-day road trip from Bangalore to Coorg, relaxed pace, waterfalls and coffee estates"'
+          />
         </label>
-        <label className="text-sm">End location (blank = back to start)
-          <input className={input} value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />
-        </label>
-        <label className="text-sm sm:col-span-2">Destination / area
-          <input className={input} value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Coastal Karnataka" />
-        </label>
-        <label className="text-sm">Start date
-          <input type="date" className={input} value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
-        </label>
-        <label className="text-sm">Number of days
-          <input type="number" min={1} max={30} className={input} value={form.days} onChange={(e) => setForm({ ...form, days: Math.min(30, Math.max(1, Number(e.target.value) || 1)) })} />
-        </label>
-        <label className="text-sm">People
-          <input className={input} value={form.people} onChange={(e) => setForm({ ...form, people: e.target.value })} placeholder="2 adults" />
-        </label>
-        <label className="text-sm">Budget
-          <input className={input} value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="₹15,000" />
-        </label>
-        <label className="text-sm sm:col-span-2">Travel preferences
-          <input className={input} value={form.preferences} onChange={(e) => setForm({ ...form, preferences: e.target.value })} placeholder="By car, relaxed pace, avoid night driving" />
-        </label>
-        <label className="text-sm sm:col-span-2">Places, interests & adventure
-          <textarea rows={2} className={input} value={form.interests} onChange={(e) => setForm({ ...form, interests: e.target.value })} placeholder="Waterfalls, beaches, river rafting in Dandeli, temples" />
-        </label>
-        <button
-          onClick={() => void run()}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60 sm:col-span-2"
-        >
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          {loading ? "Planning your trip…" : plan ? "Generate again" : "Plan My Trip with AI"}
-        </button>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-sm">Start date (optional)
+            <input type="date" className={input} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </label>
+          <button
+            onClick={() => void run()}
+            disabled={loading}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60 sm:flex-none sm:px-8"
+          >
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+            {loading ? "Planning your trip…" : plan ? "Generate again" : "Plan My Trip with AI"}
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Just type it like you'd say it — the AI works out the start, end, days and stops from your sentence.
+        </p>
       </div>
 
       {plan && (

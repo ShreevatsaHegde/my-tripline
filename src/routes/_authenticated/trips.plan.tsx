@@ -49,17 +49,8 @@ function PlanPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const generate = useServerFn(generateTripPlan);
-  const [form, setForm] = useState({
-    start: "",
-    end: "",
-    destination: "",
-    startDate: "",
-    days: 3,
-    people: "",
-    preferences: "",
-    interests: "",
-    budget: "",
-  });
+  const [prompt, setPrompt] = useState("");
+  const [startDate, setStartDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<AiPlan | null>(null);
   const [title, setTitle] = useState("");
@@ -69,10 +60,10 @@ function PlanPage() {
   const [q, setQ] = useState("");
 
   async function run() {
-    if (!form.start.trim()) { toast.error("Enter a starting location"); return; }
+    if (prompt.trim().length < 5) { toast.error("Describe your trip, e.g. \"plan trip from sirsi to gokarna for 2 days\""); return; }
     setLoading(true);
     try {
-      const p = await generate({ data: form });
+      const p = await generate({ data: { prompt: prompt.trim(), startDate } });
       // Look up real map positions for each stop, keeping the AI's position as a fallback.
       const located = await Promise.all(
         p.stops.map(async (s, i) => {

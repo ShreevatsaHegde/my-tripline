@@ -39,15 +39,8 @@ export const generateTripPlan = createServerFn({ method: "POST" })
       headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
     });
     const prompt = [
-      `Starting location: ${data.start}`,
-      `End location: ${data.end || data.start + " (round trip)"}`,
-      data.destination && `Main destination/area: ${data.destination}`,
+      `Trip request: ${data.prompt}`,
       data.startDate && `Start date: ${data.startDate}`,
-      `Number of days: ${data.days}`,
-      data.people && `People: ${data.people}`,
-      data.preferences && `Travel preferences: ${data.preferences}`,
-      data.interests && `Places/interests/activities wanted: ${data.interests}`,
-      data.budget && `Budget: ${data.budget}`,
     ]
       .filter(Boolean)
       .join("\n");
@@ -93,7 +86,7 @@ export const generateTripPlan = createServerFn({ method: "POST" })
         lon: Number.isFinite(Number(s.lon)) ? Number(s.lon) : null,
       }));
     return {
-      title: String(raw.title ?? `Trip from ${data.start}`).slice(0, 200),
+      title: String(raw.title ?? "AI trip").slice(0, 200),
       summary: String(raw.summary ?? "").slice(0, 1000),
       itinerary: String(raw.itinerary ?? "").slice(0, 6000),
       stops,

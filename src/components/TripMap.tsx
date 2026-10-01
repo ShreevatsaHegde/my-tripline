@@ -83,10 +83,10 @@ export default function TripMap({
   onSelectRoute?: (toId: string, choice: number) => void;
   places: Place[];
   legs: Leg[];
-  activeId: string | null;
-  onHover: (id: string | null) => void;
-  onSelect: (id: string) => void;
-  onMapClick: (lat: number, lng: number) => void;
+  activeId?: string | null;
+  onHover?: (id: string | null) => void;
+  onSelect?: (id: string) => void;
+  onMapClick?: (lat: number, lng: number) => void;
 }) {
   const center: [number, number] = places[0]
     ? [places[0].latitude, places[0].longitude]
@@ -104,7 +104,7 @@ export default function TripMap({
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitBounds places={places} />
-      <ClickCapture onMapClick={onMapClick} />
+      {onMapClick && <ClickCapture onMapClick={onMapClick} />}
       {legs.flatMap((leg) =>
         leg.alternatives.length > 1
           ? leg.alternatives.map((alt, ai) =>
@@ -163,9 +163,9 @@ export default function TripMap({
           zIndexOffset={tag ? 1000 : 0}
           icon={iconFor(place, destNo, activeId === place.id, tag)}
           eventHandlers={{
-            mouseover: () => onHover(place.id),
-            mouseout: () => onHover(null),
-            click: () => onSelect(place.id),
+            mouseover: () => onHover?.(place.id),
+            mouseout: () => onHover?.(null),
+            click: () => onSelect?.(place.id),
           }}
         />
         );
